@@ -8,6 +8,19 @@ from .outlier import DBSCAN
 
 if __name__ == '__main__':
 
+	# Create a dictionary to describe four mandatory keys:
+	# resource, walltime, cores and project.
+	# Resource is 'local.localhost' to execute locally
+    resources = {
+		'resource': 'ornl.summit',
+		'queue': 'batch', 		# 'killable'
+		'schema': 'local',
+		'walltime': 60 * 2, 	# 12
+		'cpus': 42 * 2, 		# 20 
+		'gpus': 6 * 2,  		# 6*20
+		'project': 'BIP179'
+	}
+
 	# Initialize hardware requirements and other parameters for each stage
 	md_kwargs = {
 		'task_name': 'BasicMD',
@@ -82,7 +95,8 @@ if __name__ == '__main__':
 	cvae_dbscan_dd = DeepDriveMD(md_sims=md_sims,
 								 preprocs=preprocs,
 								 ml_algs=ml_algs,
-								 outlier_algs=outlier_algs)
+								 outlier_algs=outlier_algs,
+								 resources=resources)
 
 
 	# Subscribe task managers to output of other stages.

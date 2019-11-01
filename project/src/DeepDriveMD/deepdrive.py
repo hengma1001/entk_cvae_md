@@ -7,7 +7,7 @@ class DeepDriveMD:
     Implements an interface for the DeepDriveMD computational 
     motif presented in: https://arxiv.org/abs/1909.07817
     """
-    def __init__(self, md_sims, preprocs, ml_algs, outlier_algs, 
+    def __init__(self, md_sims, preprocs, ml_algs, outlier_algs, resources,
     			 max_iter=1, pipeline_name='MD_ML', md_stage_name='MD',
                  pre_stage_name='Preprocess', ml_stage_name='ML',
                  outlier_stage_name='Outlier'):
@@ -30,6 +30,9 @@ class DeepDriveMD:
 		outlier_algs : list
 			list of DeepDriveMD.taskman.TaskMan objects 
             which manage outlier detection
+
+        resources : dict
+            Configuration settings for running on Summit
 
         max_iter : int
             Max number of iterations through the pipeline
