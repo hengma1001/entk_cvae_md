@@ -41,7 +41,7 @@ LEN_iter = 10
 
 def generate_training_pipeline():
     """
-    Function to generate the CVAE_MD pipeline
+    Function to generate the PCA_MD pipeline
     """
 
     def generate_MD_stage(num_MD=1): 
@@ -117,29 +117,6 @@ def generate_training_pipeline():
         return s1 
 
 
-    def generate_aggregating_stage(): 
-        """ 
-        Function to concatenate the MD trajectory (h5 contact map) 
-        """ 
-        s2 = Stage()
-        s2.name = 'aggregating'
-
-        # Aggregation task
-        t2 = Task()
-        # https://github.com/radical-collaboration/hyperspace/blob/MD/microscope/experiments/MD_to_CVAE/MD_to_CVAE.py
-        t2.pre_exec = [] 
-        t2.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh']
-        t2.pre_exec += ['conda activate %s' % conda_path] 
-        t2.pre_exec += ['cd %s/MD_to_CVAE' % base_path]
-        t2.executable = ['%s/bin/python' % conda_path]  # MD_to_CVAE.py
-        t2.arguments = ['%s/MD_to_CVAE/MD_to_CVAE.py' % base_path, 
-                '--sim_path', '%s/MD_exps/fs-pep' % base_path]
-
-        # Add the aggregation task to the aggreagating stage
-        s2.add_tasks(t2)
-        return s2 
-
-
     def generate_ML_stage(num_ML=1): 
         """
         Function to generate the learning stage
@@ -151,31 +128,25 @@ def generate_training_pipeline():
         time_stamp = int(time.time())
         for i in range(num_ML): 
             t3 = Task()
-            # https://github.com/radical-collaboration/hyperspace/blob/MD/microscope/experiments/CVAE_exps/train_cvae.py
+            # https://github.com/radical-collaboration/hyperspace/blob/MD/microscope/experiments/PCA_exps/train_pca.py
             t3.pre_exec = []
             t3.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh']
             t3.pre_exec += ['module load cuda/9.1.85']
             t3.pre_exec += ['conda activate %s' % conda_path] 
-
-            t3.pre_exec += ['export PYTHONPATH=%s/CVAE_exps:$PYTHONPATH' % base_path]
-            t3.pre_exec += ['cd %s/CVAE_exps' % base_path]
+            # t3.pre_exec += ['export PYTHONPATH=%s/PCA_exps:$PYTHONPATH' % base_path]
+            t3.pre_exec += ['cd %s/PCA_exps' % base_path]
             dim = i + 3 
-            cvae_dir = 'cvae_runs_%.2d_%d' % (dim, time_stamp+i) 
-            t3.pre_exec += ['mkdir -p {0} && cd {0}'.format(cvae_dir)]
-            t3.executable = ['%s/bin/python' % conda_path]  # train_cvae.py
-            t3.arguments = ['%s/CVAE_exps/train_cvae.py' % base_path, 
-                    '--h5_file', '%s/MD_to_CVAE/cvae_input.h5' % base_path, 
+            pca_dir = 'pca_runs_%.2d_%d' % (dim, time_stamp+i) 
+            t3.pre_exec += ['mkdir -p {0} && cd {0}'.format(pca_dir)]
+            t3.executable = ['%s/bin/python' % conda_path]  # train_pca.py
+            t3.arguments = ['%s/PCA_exps/train_pca.py' % base_path, 
+                    '--md', '%s/MD_exps/fs-pep' % base_path, 
                     '--dim', dim] 
             
             t3.cpu_reqs = {'processes': 1,
                            'process_type': None,
                     'threads_per_process': 4,
                     'thread_type': 'OpenMP'
-                    }
-            t3.gpu_reqs = {'processes': 1,
-                           'process_type': None,
-                    'threads_per_process': 1,
-                    'thread_type': 'CUDA'
                     }
         
             # Add the learn task to the learning stage
@@ -194,12 +165,12 @@ def generate_training_pipeline():
         t4.pre_exec += ['module load cuda/9.1.85']
         t4.pre_exec += ['conda activate %s' % conda_path] 
 
-        t4.pre_exec += ['export PYTHONPATH=%s/CVAE_exps:$PYTHONPATH' % base_path] 
+        t4.pre_exec += ['export PYTHONPATH=%s/PCA_exps:$PYTHONPATH' % base_path] 
         t4.pre_exec += ['cd %s/Outlier_search' % base_path] 
         t4.executable = ['%s/bin/python' % conda_path] 
         t4.arguments = ['outlier_locator.py', 
                 '--md', '%s/MD_exps/fs-pep' % base_path, 
-                '--cvae', '%s/CVAE_exps' % base_path, 
+                '--pca', '%s/PCA_exps' % base_path, 
                 '--pdb', '%s/MD_exps/fs-pep/pdb/100-fs-peptide-400K.pdb' % base_path, 
                 '--ref', '%s/MD_exps/fs-pep/pdb/fs-peptide.pdb' % base_path]
 
@@ -208,11 +179,7 @@ def generate_training_pipeline():
                 'threads_per_process': 12,
                 'thread_type': 'OpenMP'
                 }
-        t4.gpu_reqs = {'processes': 1,
-                           'process_type': None,
-                'threads_per_process': 1,
-                'thread_type': 'CUDA'
-                }
+        
         s4.add_tasks(t4) 
         s4.post_exec = func_condition 
         
@@ -237,12 +204,6 @@ def generate_training_pipeline():
         p.add_stages(s1)
 
         if CUR_STAGE % RETRAIN_FREQ == 0: 
-            # --------------------------
-            # Aggregate stage
-            s2 = generate_aggregating_stage() 
-            # Add the aggregating stage to the training pipeline
-            p.add_stages(s2)
-
             # --------------------------
             # Learning stage
             s3 = generate_ML_stage(num_ML=10) 
@@ -270,12 +231,6 @@ def generate_training_pipeline():
     s1 = generate_MD_stage(num_MD=6 * 2)
     # Add simulating stage to the training pipeline
     p.add_stages(s1)
-
-    # --------------------------
-    # Aggregate stage
-    s2 = generate_aggregating_stage() 
-    # Add the aggregating stage to the training pipeline
-    p.add_stages(s2)
 
     # --------------------------
     # Learning stage

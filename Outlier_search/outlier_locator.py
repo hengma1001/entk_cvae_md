@@ -15,8 +15,8 @@ DEBUG = 1
 # Inputs 
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--md", help="Input: MD simulation directory")
-# parser.add_argument("-o", help="output: cvae weight file. (Keras cannot load model directly, will check again...)")
-parser.add_argument("-c", "--cvae", help="Input: CVAE model directory")
+# parser.add_argument("-o", help="output: pca weight file. (Keras cannot load model directly, will check again...)")
+parser.add_argument("-c", "--pca", help="Input: CVAE model directory")
 parser.add_argument("-p", "--pdb", help="Input: pdb file") 
 parser.add_argument("-r", "--ref", default=None, help="Input: Reference pdb for RMSD") 
 
@@ -35,10 +35,10 @@ if cm_files_list == []:
     raise IOError("No h5/traj file found, recheck your input filepath") 
 
 # Find the latest trained model 
-pca_model = sorted(glob(os.path.join(args.cvae, 'pca_runs_*/pca_model.pkl')))[-1]  
+pca_model = sorted(glob(os.path.join(args.pca, 'pca_runs_*/pca_model.pkl')))[-1]  
 print "Using model {}".format(pca_model) 
     
-# Convert everything to cvae input 
+# Convert everything to pca input 
 cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files_list] 
 pca_input = np.hstack(cm_data_lists).T 
 
