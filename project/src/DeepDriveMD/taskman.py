@@ -17,15 +17,10 @@ class TaskMan(metaclass=ABCMeta):
 
 		"""
 		self.task_name = task_name
-		self.outfile = str()
-		self.subscriptions = dict()
+		self.cpu_reqs = cpu_reqs
+		self.gpu_reqs = gpu_reqs
 		self.input = dict()
 
-		# For minimizing the amount of disk IO.
-		# Only needs to write output data once.
-		# Reads input data once, and stores dictionary in self.input
-		self.has_read = False
-		self.has_written = False
 
 	@abstractmethod
 	def output(self):
@@ -33,7 +28,7 @@ class TaskMan(metaclass=ABCMeta):
 		Effects
 		-------
 		Defines a dictionary of output to be passed to the next 
-		stages TaskMan's. Calls self.write_output().
+		stages TaskMan's.
 
 		"""
 		raise NotImplementedError('Should implement output()')
@@ -55,75 +50,21 @@ class TaskMan(metaclass=ABCMeta):
 		Parameters
 		----------
 		taskmans : list
-			list of DeepDriveMD.tasks.TaskMan objects 
-			which manage different types of tasks within the pipeline
+			list of DeepDriveMD.taskman.TaskMan objects 
+			which manage different types of tasks within the pipeline.
 				
 		Effects
 		-------
-		Sets infile to the outfile of the previous MD stages.
-
-		"""
-		self.subscriptions = {t.task_name : t.outfile for t in taskmans}
-
-
-	def read_input(self):
-		"""
-		Parameters
-		----------
-
-		Effects
-		-------
-		Reads data from all subscriptions. 
-		Only reads once and then stores data in self.input.
-
-		Return
-		----------
-		result : dict
-			stores user defined set of metadata to coordinate data 
-			transfer between stages.
+		Sets input to the output of dependencies.
 
 		"""
 
-		if not self.has_read:
-			for key, val in self.subscriptions.items():
-				with open(val, 'rb') as f:
-					self.input[key] = pickle.load(f)
+		task_names = set(t.task_name for t in taskmans)
+		
+		if self.task_name in task_names:
+			raise Exception('Cannot subscribe to self')
 
-			self.has_read = True
+		if len(task_names) != len(taskmans):
+			raise Exception('Naming collision between task managers')
 
-		# TODO: consider functools.lru_cache
-		# TODO: currently not using return
-
-		return self.input
-
-
-	def write_output(self, data):
-		"""
-		Parameters
-		----------
-		data : dict
-			stores user defined set of metadata to coordinate data 
-			transfer between stages.
-
-		Effects
-		-------
-		Writes data to outfile for subscribers to read.
-		Only writes once.
-
-		"""
-		if not self.has_written:
-			with open(self.outfile, 'wb') as f:
-				pickle.dump(data, f)
-
-			self.has_written = True
-
-
-	def force_read(self):
-		"""
-		Effects
-		-------
-		Reads from subscriptions even if already read before.
-
-		"""
-		self.has_read = False
-		self.read_input()
+		self.input = dict((t.task_name, t.output()) for t in taskmans)

@@ -10,8 +10,7 @@ class ContactMatrix(TaskMan):
 		self.cwd = os.getcwd()
 
 	def output(self):
-		output_data = {'--h5': '/MD_to_CVAE/cvae_input.h5'}
-		self.write_output(output_data)
+		return {'--h5': '/MD_to_CVAE/cvae_input.h5'}
 
 	def tasks(self):
 		# self.input stores sim_path: base/MD_exps/fs-pep

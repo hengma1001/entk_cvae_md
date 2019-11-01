@@ -77,9 +77,6 @@ class DeepDriveMD:
         self.ml_algs = ml_algs
         self.outlier_algs = outlier_algs
 
-        # Initialize each incomming list of TaskMan's with output files.
-        self.__init_log_dir()
-
         # Sets pipeline stages
         self.pipeline()
 
@@ -92,65 +89,14 @@ class DeepDriveMD:
         # this way, all the pipelines in the list will execute concurrently.
         self.appman.workflow = [self.__pipeline]
 
-    def __init_log_dir(self):
-        """
-        Effects
-        -------
-        Creates {cwd}/deepdrive_logs directory for logging.
-        Raises error if log directory already exists.
-
-        Initialize each incomming list of TaskMan's with output files.
-        Then writes output (file metadata) for inter-TaskMan communications
-        to respective output files.
-        
-        """
-        # Create log directory
-        log_dir = '{}/deepdrive_logs'.format(os.getcwd())
-        if not os.path.exists(log_dir):
-            os.mkdir(log_dir)
-        else:
-            raise FileExistsError('Log directory already exits. Please remove: {}'.format(log_dir))
-
-
-        # Define each outfile and then write output data to each respective file
-        for i, md_sim in enumerate(self.md_sims):
-            md_sim.outfile = '{}/md_sim_{}_{}.pickle'.format(log_dir, md_sim.task_name, i)
-            md_sim.output()
-
-        for i, preproc in enumerate(self.preprocs):
-            preproc.outfile = '{}/preproc_{}_{}.pickle'.format(log_dir, preproc.task_name, i)
-            preproc.output()
-
-        for i, ml_alg in enumerate(self.ml_algs):
-            ml_alg.outfile = '{}/ml_alg_{}_{}.pickle'.format(log_dir, ml_alg.task_name, i)
-            ml_alg.output()
-
-        for i, outlier_alg in enumerate(self.outlier_algs):
-            outlier_alg.outfile = '{}/outlier_alg_{}_{}.pickle'.format(log_dir, outlier_alg.task_name, i)
-            outlier_alg.output()
-
 
 	def run(self):
 		"""
 		Effects
 		-------
-		Reads data from subscriptions and runs the Application Manager. 
+		Runs the Application Manager. 
 		
 		"""
-
-        # Read input data from subscriptions
-        for md_sim in self.md_sim:
-            md_sim.read_input()
-
-        for preproc in self.preprocs:
-            preproc.read_input()
-
-        for ml_alg in self.ml_algs:
-            ml_alg.read_input()
-
-        for outlier_alg in self.outlier_algs:
-            outlier_alg.read_input()
-
         self.appman.run()
 
 

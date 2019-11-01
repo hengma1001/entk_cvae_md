@@ -35,27 +35,30 @@ class BasicMD(TaskMan):
 
 		self.initial_MD = True
 
+	def output(self):
+		"""
+		Effects
+		-------
+		Defines a dictionary of output to be passed to 
+		other subscribing tasks.
+
+		Returns
+		-------
+		output dictionary
+
+		"""
+        return {'sim_path': 'base/MD_exps/fs-pep'}
+
 	def task(self, sim_num, time_stamp):
 
 
-		# TODO: tricky situation. the first run through the pipeline
-		#		means that there is no outlier_path yet because the
-		#		dbscan tasks() function has not been called (so it hasn't writen).
-		#		maybe use force_read() until outlier_filepath is in DBSCAN dict.
-		#		note: self.input will not be empty, it will contain DBSCAN as a key to
-		#			  an empty dict. See read_input() for why.
-
-		if self.initial_MD:
-			self.force_read()
-
-
-		outlier_filepath = self.input['DBSCAN'].get('outlier_filepath')
+		outlier_filepath = self.input['DBSCAN']['outlier_filepath']
     	
 
 		# TODO: put in RL stage
     	#outlier_filepath = '%s/Outlier_search/restart_points.json' % base_path
 
-    	if outlier_filepath and os.path.exists(outlier_filepath): 
+    	if os.path.exists(outlier_filepath): 
 	        self.initial_MD = False 
 	        with open(outlier_filepath, 'r') as f:
 	        	outlier_list = json.load(f) 
@@ -96,10 +99,6 @@ class BasicMD(TaskMan):
 
         task.cpu_reqs = self.cpu_reqs
 		task.gpu_reqs = self.gpu_reqs
-
-        output = {'--h5': '/MD_to_CVAE/cvae_input.h5'}
-
-        self.write_output(output)
 
         return task
 

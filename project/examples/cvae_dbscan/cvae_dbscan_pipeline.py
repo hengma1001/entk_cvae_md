@@ -91,6 +91,23 @@ if __name__ == '__main__':
 	ml_algs = [CVAE(**ml_kwargs)]
 	outlier_algs = [DBSCAN(**outlier_kwargs)]
 
+
+	# Subscribe task managers to output of other tasks.
+	# In this case we only have one task in each stage.
+
+	for md_sim in md_sims:
+		md_sim.subscribe(outlier_algs)
+
+	for preproc in preprocs:
+		preproc.subscribe(md_sims)
+
+	for ml_alg in ml_algs:
+		ml_alg.subscribe(preprocs)
+
+	for outlier_alg in outlier_algs:
+		outlier_alg.subscribe(ml_algs)
+
+
 	# Initialize DeepDriveMD object to manage pipeline.
 	cvae_dbscan_dd = DeepDriveMD(md_sims=md_sims,
 								 preprocs=preprocs,
@@ -98,25 +115,6 @@ if __name__ == '__main__':
 								 outlier_algs=outlier_algs,
 								 resources=resources)
 
-
-	# Subscribe task managers to output of other stages.
-	# This step must follow DeepDriveMD initialization 
-	# so that each task manager has been given a unique 
-	# file buffer for message passing.
-	# In this case we only have one task in each category
-	# so we assign all combinations.
-
-	for md_sim in cvae_dbscan_dd.md_sims:
-		md_sim.subscribe(cvae_dbscan_dd.outlier_algs)
-
-	for preproc in cvae_dbscan_dd.preprocs:
-		preproc.subscribe(cvae_dbscan_dd.md_sims)
-
-	for ml_alg in cvae_dbscan_dd.ml_algs:
-		ml_alg.subscribe(cvae_dbscan_dd.preprocs)
-
-	for outlier_alg in cvae_dbscan_dd.outlier_algs:
-		outlier_alg.subscribe(cvae_dbscan_dd.ml_algs)
 
 	# Start running program on Summit.
 	cvae_dbscan_dd.run()
