@@ -3,8 +3,6 @@ import numpy as np
 import h5py 
 import errno 
 import MDAnalysis as mda 
-from cvae.CVAE import CVAE
-from keras import backend as K 
 from sklearn.cluster import DBSCAN 
 
 def triu_to_full(cm0):
@@ -79,28 +77,6 @@ def make_dir_p(path_name):
             raise
         pass
 
-
-def outliers_from_cvae(model_weight, cvae_input, hyper_dim=3, eps=0.35): 
-    os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"]=str(0)  
-    cvae = CVAE(cvae_input.shape[1:], hyper_dim) 
-    cvae.model.load_weights(model_weight)
-    cm_predict = cvae.return_embeddings(cvae_input) 
-    db = DBSCAN(eps=eps, min_samples=10).fit(cm_predict)
-    db_label = db.labels_
-    outlier_list = np.where(db_label == -1)
-    K.clear_session()
-    return outlier_list
-
-def predict_from_cvae(model_weight, cvae_input, hyper_dim=3): 
-    os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"]=str(0)  
-    cvae = CVAE(cvae_input.shape[1:], hyper_dim) 
-    cvae.model.load_weights(model_weight)
-    cm_predict = cvae.return_embeddings(cvae_input) 
-    del cvae 
-    K.clear_session()
-    return cm_predict
 
 def outliers_from_latent(cm_predict, eps=0.35): 
     db = DBSCAN(eps=eps, min_samples=10).fit(cm_predict)

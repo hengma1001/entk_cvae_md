@@ -1,10 +1,11 @@
-import os, random, json, shutil 
-import argparse 
+import os, sys 
+import random, json, shutil 
+import argparse  
 import numpy as np 
 from glob import glob
 import MDAnalysis as mda
-from utils import read_h5py_file, outliers_from_cvae, cm_to_cvae  
-from utils import predict_from_cvae, outliers_from_latent
+from sklearn.externals import joblib 
+from utils import read_h5py_file, outliers_from_latent
 from utils import find_frame, write_pdb_frame, make_dir_p 
 from  MDAnalysis.analysis.rms import RMSD
 
@@ -33,34 +34,18 @@ checkpnt_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/checkpnt.chk')))
 if cm_files_list == []: 
     raise IOError("No h5/traj file found, recheck your input filepath") 
 
-# Find all the trained model weights 
-model_weights = sorted(glob(os.path.join(args.cvae, 'cvae_runs_*/cvae_weight.h5'))) 
-# model_losses = sorted(glob(os.path.join(args.cvae, 'cvae_runs_*/loss.npy')))
-# model_final_loss = [np.load(model_loss)[-1] for model_loss in model_losses] 
-
-# identify the latest models with lowest loss 
-model_best = model_weights[0] 
-loss_model_best = np.load(os.path.join(os.path.dirname(model_best), 'loss.npy'))[-1] 
-for i in range(len(model_weights)):  
-    if i + 1 < len(model_weights): 
-        if int(os.path.basename(os.path.dirname(model_weights[i]))[10:12]) != int(os.path.basename(os.path.dirname(model_weights[i+1]))[10:12]):
-            loss = np.load(os.path.join(os.path.dirname(model_weights[i]), 'loss.npy'))[-1]  
-            if loss < loss_model_best: 
-                model_best, loss_model_best = model_weights[i], loss 
-    else: 
-        loss = np.load(os.path.join(os.path.dirname(model_weights[i]), 'loss.npy'))[-1] 
-        if loss < loss_model_best:
-            model_best, loss_model_best = model_weights[i], loss
-
-print "Using model {} with loss {}".format(model_best, loss_model_best) 
+# Find the latest trained model 
+pca_model = sorted(glob(os.path.join(args.cvae, 'pca_runs_*/pca_model.pkl')))[-1]  
+print "Using model {}".format(pca_model) 
     
 # Convert everything to cvae input 
 cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files_list] 
-cvae_input = cm_to_cvae(cm_data_lists)
+pca_input = np.hstack(cm_data_lists).T 
 
 # A record of every trajectory length
 train_data_length = [cm_data.shape[1] for cm_data in cm_data_lists]
 traj_dict = dict(zip(traj_file_list, train_data_length)) 
+print traj_dict
 
 
 # Outlier search 
@@ -77,26 +62,28 @@ else:
 
 # for model_weight in model_weights: 
 # Identify the latent dimensions 
-model_dim = int(os.path.basename(os.path.dirname(model_best))[10:12]) 
+model_dim = int(os.path.basename(os.path.dirname(pca_model))[9:11]) 
 print 'Model latent dimension: %d' % model_dim  
+
 # Get the predicted embeddings 
-cm_predict = predict_from_cvae(model_best, cvae_input, hyper_dim=model_dim) 
+pca = joblib.load(pca_model)  
+pca_predict = pca.transform(pca_input)  
 # initialize eps if empty 
-if str(model_best) in eps_record.keys(): 
-    eps = eps_record[model_best] 
+if str(pca_model) in eps_record.keys(): 
+    eps = eps_record[pca_model] 
 else: 
     eps = 0.2 
 
 # Search the right eps for DBSCAN 
 while True: 
-    outliers = np.squeeze(outliers_from_latent(cm_predict, eps=eps)) 
+    outliers = np.squeeze(outliers_from_latent(pca_predict, eps=eps)) 
     n_outlier = len(outliers) 
     print('dimension = {0}, eps = {1:.2f}, number of outlier found: {2}'.format(
         model_dim, eps, n_outlier))
     if n_outlier > 150: 
         eps = eps + 0.05 
     else: 
-        eps_record[model_best] = eps 
+        eps_record[pca_model] = eps 
         outlier_list.append(outliers) 
         break 
 
