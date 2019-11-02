@@ -1,4 +1,5 @@
 import os
+import time
 from radical.entk import Task
 from DeepDriveMD.taskman import TaskMan
 
@@ -47,16 +48,11 @@ class BasicMD(TaskMan):
 		output dictionary
 
 		"""
-        return {'sim_path': 'base/MD_exps/fs-pep'}
+        return {'--sim_path': '%s/MD_exps/fs-pep' % self.cwd}
 
 	def task(self, sim_num, time_stamp):
 
-
 		outlier_filepath = self.input['DBSCAN']['outlier_filepath']
-    	
-
-		# TODO: put in RL stage
-    	#outlier_filepath = '%s/Outlier_search/restart_points.json' % base_path
 
     	if os.path.exists(outlier_filepath): 
 	        self.initial_MD = False 
@@ -66,36 +62,32 @@ class BasicMD(TaskMan):
 		task = Task()
 		task.pre_exec = ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh',
 						 'module load cuda/9.1.85'
-						 'conda activate %s' % conda_path,
-						 'export PYTHONPATH=%s/MD_exps:$PYTHONPATH' % base_path,
-						 'cd %s/MD_exps/fs-pep' % base_path,
+						 'conda activate %s' % self.conda_path,
+						 'export PYTHONPATH=%s/MD_exps:$PYTHONPATH' % self.cwd,
+						 'cd %s/MD_exps/fs-pep' % self.cwd,
 						 'mkdir -p omm_runs_%d && cd omm_runs_%d' % (time_stamp+sim_num, time_stamp+sim_num)]
 
-		task.executable = ['%s/bin/python' % conda_path]
-		task.arguments = ['%s/MD_exps/fs-pep/run_openmm.py' % base_path,
-						  '--sim_path', md_data['--sim_path']]
+		task.executable = ['%s/bin/python' % self.conda_path]
+		task.arguments = ['%s/MD_exps/fs-pep/run_openmm.py' % self.cwd]
 
         # Pick initial point of simulation 
         task.arguments.append('--pdb_file')
 
         if self.initial_MD or sim_num >= len(outlier_list): 
-            task.arguments.append('%s/MD_exps/fs-pep/pdb/100-fs-peptide-400K.pdb' % base_path)
+            task.arguments.append('%s/MD_exps/fs-pep/pdb/100-fs-peptide-400K.pdb' % self.cwd)
 
         elif outlier_list[sim_num].endswith('pdb'): 
             task.arguments.append(outlier_list[sim_num])
             task.pre_exec.append('cp %s ./' % outlier_list[sim_num]) 
 
         elif outlier_list[sim_num].endswith('chk'): 
-            task.arguments.extend('%s/MD_exps/fs-pep/pdb/100-fs-peptide-400K.pdb' % base_path,
-                    			  '-c', outlier_list[sim_num]) 
+            task.arguments.extend(['%s/MD_exps/fs-pep/pdb/100-fs-peptide-400K.pdb' % self.cwd,
+                    			  '-c', outlier_list[sim_num]]) 
             task.pre_exec.append('cp %s ./' % outlier_list[sim_num])
 
         # How long to run the simulation
-        task.arguments.append('--length')
-        if self.initial_MD: 
-            task.arguments.append(self.initial_len) 
-        else: 
-            task.arguments.append(self.iter_len)
+        task.arguments.extend(['--length', 
+        		self.initial_len if self.initial_MD else self.iter_len])
 
         task.cpu_reqs = self.cpu_reqs
 		task.gpu_reqs = self.gpu_reqs

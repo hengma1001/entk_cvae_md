@@ -21,7 +21,8 @@ if __name__ == '__main__':
 		'project': 'BIP179'
 	}
 
-	# Initialize hardware requirements and other parameters for each stage
+	# Initialize hardware requirements and other parameters for each stage.
+	# Note: each task_name must be unique.
 	md_kwargs = {
 		'task_name': 'BasicMD',
 		'num_sims': 6*2,

@@ -10,12 +10,11 @@ class ContactMatrix(TaskMan):
 		self.cwd = os.getcwd()
 
 	def output(self):
-		return {'--h5': '/MD_to_CVAE/cvae_input.h5'}
+		return {'--h5_file': '%s/MD_to_CVAE/cvae_input.h5' % self.cwd}
 
 	def tasks(self):
-		# self.input stores sim_path: base/MD_exps/fs-pep
+		# self.input stores --sim_path: self.cwd/MD_exps/fs-pep
 		
-
 		task = Task()
 
 		task.pre_exec = ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh',

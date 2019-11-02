@@ -1,5 +1,4 @@
 from abc import ABCMeta, abstractmethod
-import cPickle as pickle
 
 class TaskMan(metaclass=ABCMeta):
 	def __init__(self, task_name, cpu_reqs, gpu_reqs):
@@ -60,7 +59,7 @@ class TaskMan(metaclass=ABCMeta):
 		"""
 
 		task_names = set(t.task_name for t in taskmans)
-		
+
 		if self.task_name in task_names:
 			raise Exception('Cannot subscribe to self')
 
