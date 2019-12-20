@@ -11,6 +11,7 @@ else:
 print status 
 omm_dirs = glob.glob('MD_exps/fs-pep/omm_runs*') 
 cvae_dirs = glob.glob('CVAE_exps/cvae_runs_*') 
+tica_dirs = glob.glob('TICA_exps/tica_runs_*') 
 jsons = glob.glob('Outlier_search/*json') 
 
 result_save = os.path.join('./results', 'result_%d_%s' % (int(time.time()), status)) 
@@ -25,6 +26,12 @@ cvae_save = os.path.join(result_save, 'cvae_results')
 os.makedirs(cvae_save) 
 for cvae_dir in cvae_dirs: 
     shutil.move(cvae_dir, cvae_save) 
+
+tica_save = os.path.join(result_save, 'tica_results') 
+os.makedirs(tica_save) 
+for tica_dir in tica_dirs: 
+    shutil.move(tica_dir, tica_save) 
+
 
 outlier_save = os.path.join(result_save, 'outlier_save/') 
 os.makedirs(outlier_save) 

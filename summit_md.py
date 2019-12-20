@@ -33,10 +33,10 @@ base_path = os.path.abspath('.') # '/gpfs/alpine/proj-shared/bip179/entk/hypersp
 conda_path = '/ccs/home/hm0/.conda/envs/omm'
 
 CUR_STAGE=0
-MAX_STAGE=10
+MAX_STAGE=0 # 10
 RETRAIN_FREQ = 5
 
-LEN_initial = 100
+LEN_initial = 10 # 100
 LEN_iter = 10 
 
 def generate_training_pipeline():
@@ -180,6 +180,31 @@ def generate_training_pipeline():
         
             # Add the learn task to the learning stage
             s3.add_tasks(t3)
+
+        # TICA jobs 
+        time_stamp = int(time.time())
+        for i in range(num_ML): 
+            t3 = Task() 
+            t3.pre_exec = []
+            t3.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh']
+            t3.pre_exec += ['conda activate %s' % conda_path]
+            t3.pre_exec += ['cd %s/TICA_exps' % base_path]
+            dim = i + 3
+            tica_dir = 'tica_runs_%.2d_%d' % (dim, time_stamp+i)
+            t3.pre_exec += ['mkdir -p {0} && cd {0}'.format(tica_dir)]
+            t3.executable = ['%s/bin/python' % conda_path]  # train_tica.py
+            t3.arguments = ['%s/TICA_exps/train_tica.py' % base_path,
+                    '--md', '%s/MD_exps/fs-pep' % base_path,
+                    '--dim', dim]
+
+            t3.cpu_reqs = {'processes': 1,
+                           'process_type': None,
+                    'threads_per_process': 4,
+                    'thread_type': 'OpenMP'
+                    }
+            # Add the learn task to the learning stage
+            s3.add_tasks(t3)
+
         return s3 
 
 
@@ -200,6 +225,7 @@ def generate_training_pipeline():
         t4.arguments = ['outlier_locator.py', 
                 '--md', '%s/MD_exps/fs-pep' % base_path, 
                 '--cvae', '%s/CVAE_exps' % base_path, 
+                '--tica', '%s/TICA_exps' % base_path, 
                 '--pdb', '%s/MD_exps/fs-pep/pdb/100-fs-peptide-400K.pdb' % base_path, 
                 '--ref', '%s/MD_exps/fs-pep/pdb/fs-peptide.pdb' % base_path]
 

@@ -4,9 +4,9 @@ import numpy as np
 from glob import glob
 import MDAnalysis as mda
 from utils import read_h5py_file, outliers_from_cvae, cm_to_cvae  
-from utils import predict_from_cvae, outliers_from_latent
+from utils import predict_from_cvae, outliers_from_latent, predict_from_tica
 from utils import find_frame, write_pdb_frame, make_dir_p 
-from  MDAnalysis.analysis.rms import RMSD
+from  MDAnalysis.analysis.rms import rmsd
 
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 DEBUG = 1 
@@ -15,6 +15,7 @@ DEBUG = 1
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--md", help="Input: MD simulation directory")
 # parser.add_argument("-o", help="output: cvae weight file. (Keras cannot load model directly, will check again...)")
+parser.add_argument("-t", "--tica", help="Input: PCA-TICA model directory") 
 parser.add_argument("-c", "--cvae", help="Input: CVAE model directory")
 parser.add_argument("-p", "--pdb", help="Input: pdb file") 
 parser.add_argument("-r", "--ref", default=None, help="Input: Reference pdb for RMSD") 
@@ -53,10 +54,16 @@ for i in range(len(model_weights)):
             model_best, loss_model_best = model_weights[i], loss
 
 print "Using model {} with loss {}".format(model_best, loss_model_best) 
+
+# Find tica models with most dimensions  
+tica_model = sorted(glob(os.path.join(args.tica, 'tica_runs_*/tica_model.pkl')))[-1] 
     
 # Convert everything to cvae input 
 cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files_list] 
 cvae_input = cm_to_cvae(cm_data_lists)
+# tica input 
+tica_input = np.hstack(cm_data_lists)  
+print tica_input.shape 
 
 # A record of every trajectory length
 train_data_length = [cm_data.shape[1] for cm_data in cm_data_lists]
@@ -65,6 +72,7 @@ traj_dict = dict(zip(traj_file_list, train_data_length))
 
 # Outlier search 
 outlier_list = [] 
+outlier_tags = [] 
 
 ## eps records for next iteration 
 eps_record_filepath = './eps_record.json' 
@@ -75,40 +83,50 @@ if os.path.exists(eps_record_filepath):
 else: 
     eps_record = {} 
 
-# for model_weight in model_weights: 
-# Identify the latent dimensions 
-model_dim = int(os.path.basename(os.path.dirname(model_best))[10:12]) 
-print 'Model latent dimension: %d' % model_dim  
-# Get the predicted embeddings 
-cm_predict = predict_from_cvae(model_best, cvae_input, hyper_dim=model_dim) 
-# initialize eps if empty 
-if str(model_best) in eps_record.keys(): 
-    eps = eps_record[model_best] 
-else: 
-    eps = 0.2 
-
-# Search the right eps for DBSCAN 
-while True: 
-    outliers = np.squeeze(outliers_from_latent(cm_predict, eps=eps)) 
-    n_outlier = len(outliers) 
-    print('dimension = {0}, eps = {1:.2f}, number of outlier found: {2}'.format(
-        model_dim, eps, n_outlier))
-    # get up to 1500 outliers 
-    if n_outlier > 1500: 
-        eps = eps + 0.05 
+models = [model_best, tica_model] 
+for model in models:
+    model_info = os.path.basename(os.path.dirname(model))
+    # Identify the latent dimensions 
+    model_dim = int(model_info[10:12]) 
+    print 'Model %s latent dimension: %d' % (model_info, model_dim)   
+    # Get the predicted embeddings 
+    if model_info.startswith('cvae'): 
+        cm_predict = predict_from_cvae(model, cvae_input, hyper_dim=model_dim) 
+    elif model_info.startswith('tica'): 
+        cm_predict = predict_from_tica(model, tica_input) 
     else: 
-        eps_record[model_best] = eps 
-        outlier_list.append(outliers) 
-        break 
+        print 'Unknown model...' 
+        continue 
+    # initialize eps if empty 
+    if str(model) in eps_record.keys(): 
+        eps = eps_record[model] 
+    else: 
+        eps = 0.2 
+
+    # Search the right eps for DBSCAN 
+    while True: 
+        outliers = np.squeeze(outliers_from_latent(cm_predict, eps=eps)) 
+        n_outlier = len(outliers) 
+        print('dimension = {0}, eps = {1:.2f}, number of outlier found: {2}'.format(
+            model_dim, eps, n_outlier))
+        # get up to 1500 outliers 
+        if n_outlier > 750: 
+            eps = eps + 0.05 
+        else: 
+            eps_record[model] = eps 
+            outlier_list += list(outliers) 
+            outlier_tags += [model_info[:4]] * len(outliers) 
+            break 
 
 ## Unique outliers 
-outlier_list_uni, outlier_count = np.unique(np.hstack(outlier_list), return_counts=True) 
+# outlier_list = np.hstack(outlier_list) 
+# outlier_tag = np.hstack(outlier_tag) 
 ## Save the eps for next iteration 
 with open(eps_record_filepath, 'w') as eps_file: 
         json.dump(eps_record, eps_file) 
 
 if DEBUG: 
-    print outlier_list_uni
+    print outlier_list, outlier_tags
     
 
 # Write the outliers using MDAnalysis 
@@ -117,10 +135,10 @@ make_dir_p(outliers_pdb_path)
 print 'Writing outliers in %s' % outliers_pdb_path  
 
 new_outliers_list = [] 
-for outlier in outlier_list_uni: 
+for outlier, tag in zip(outlier_list, outlier_tags): 
     traj_file, num_frame = find_frame(traj_dict, outlier)  
-    outlier_pdb_file = os.path.join(outliers_pdb_path, '{}_{:06d}.pdb'.format(os.path.basename(os.path.dirname(traj_file)), num_frame)) 
-    # Only write new pdbs to reduce redundancy. 
+    outlier_pdb_file = os.path.join(outliers_pdb_path, '{}_{:06d}_{}.pdb'.format(os.path.basename(os.path.dirname(traj_file)), num_frame, tag)) 
+    # Only write new pdbs to reduce redundant I/O. 
     if not os.path.exists(outlier_pdb_file): 
         print 'Found a new outlier# {} at frame {} of {}'.format(outlier, num_frame, traj_file)
         outlier_pdb = write_pdb_frame(traj_file, pdb_file, num_frame, outlier_pdb_file)  
@@ -165,13 +183,18 @@ if DEBUG:
 
 # rank the restart_pdbs according to their RMSD to local state 
 if ref_pdb_file: 
-    outlier_traj = mda.Universe(restart_pdbs[0], restart_pdbs) 
     ref_traj = mda.Universe(ref_pdb_file) 
-    R = RMSD(outlier_traj, ref_traj, select='protein and name CA') 
-    R.run()    
+    ref_CA = ref_traj.select_atoms('protein and name CA') 
+    outlier_rmsds = [] 
+    for restart_pdb in restart_pdbs: 
+        outlier_pro = mda.Universe(restart_pdb) 
+        outlier_CA = outlier_pro.select_atoms('protein and name CA') 
+        outlier_rmsd = rmsd(outlier_CA.positions, ref_CA.positions, 
+                superposition=True) 
+        outlier_rmsds.append(outlier_rmsd) 
     # Make a dict contains outliers and their RMSD
     # outlier_pdb_RMSD = dict(zip(restart_pdbs, R.rmsd[:,2]))
-    restart_pdbs = [pdb for _, pdb in sorted(zip(R.rmsd[:,2], restart_pdbs))] 
+    restart_pdbs = [pdb for _, pdb in sorted(zip(outlier_rmsds, restart_pdbs))] 
 else: 
     random.shuffle(restart_pdbs) 
 

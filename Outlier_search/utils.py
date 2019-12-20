@@ -4,8 +4,10 @@ import h5py
 import errno 
 import MDAnalysis as mda 
 from cvae.CVAE import CVAE
+from TD2 import TD2
 from keras import backend as K 
 from sklearn.cluster import DBSCAN 
+from sklearn.externals import joblib 
 
 def triu_to_full(cm0):
     num_res = int(np.ceil((len(cm0) * 2) ** 0.5))
@@ -101,6 +103,14 @@ def predict_from_cvae(model_weight, cvae_input, hyper_dim=3):
     del cvae 
     K.clear_session()
     return cm_predict
+
+def predict_from_tica(model, tica_input): 
+    pca = joblib.load(model)  
+    pca_predict = pca.transform(tica_input)  
+    tica_cm = TD2(tica_input, m=pca_predict.shape[1], 
+            U=pca_predict, lag=10) 
+    return np.array(tica_cm[0]).T 
+
 
 def outliers_from_latent(cm_predict, eps=0.35): 
     db = DBSCAN(eps=eps, min_samples=10).fit(cm_predict)
