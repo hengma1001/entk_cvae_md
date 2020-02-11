@@ -3,6 +3,7 @@ import sys
 import glob 
 import json 
 import errno
+import argparse 
 import numpy as np 
 
 # echo "runner.py -i /gpfs/alpine/proj-shared/lrn005/RLDock/pdbs_traj/test_p0.pdb
@@ -85,10 +86,28 @@ def rank_by_dock(pdb_list):
 
 
 if __name__ == "__main__": 
-    outlier_path = "/gpfs/alpine/bip179/scratch/hm0/entk_MDs/"\
-                   "experiments_folding/experiments_BBA/Outlier_search/" \
-                   "outlier_pdbs/"
-    pdb_list = glob.glob(outlier_path + "omm_run*pdb") 
-    select_pdb_rank = rank_by_dock(pdb_list) 
-    pdb_list_save = os.path.abspath("./pdb_rld.json") 
+    parser = argparse.ArgumentParser() 
+    parser.add_argument("-f", "--op", help="Input: Path of outlier pdbs") 
+    parser.add_argument("-m", "--md", help="Input: MD simulation directory") 
+    pasrer.add_argument("-o", "--rp", help="Output: ranked pdb files") 
+    args = parser.parse_args() 
+    outliers_pdb_path = os.path.abspath(args.op)
+
+    ### Get the pdbs used once already
+    used_pdbs = glob.glob(os.path.join(args.md, 'omm_runs_*/omm_runs_*.pdb'))
+    used_pdbs_basenames = [os.path.basename(used_pdb) for used_pdb in used_pdbs ]
+
+#                     "/gpfs/alpine/bip179/scratch/hm0/entk_MDs/"\
+#                    "experiments_folding/experiments_BBA/Outlier_search/" \
+#                    "outlier_pdbs/"
+    
+    ### Exclude the used pdbs
+    outliers_list = glob.glob(os.path.join(outliers_pdb_path, 'omm_runs*.pdb'))
+    restart_pdbs = [outlier for outlier in outliers_list 
+            if os.path.basename(outlier) not in used_pdbs_basenames]  
+    
+    select_pdb_rank = rank_by_dock(restart_pdbs) 
+    print used_pdbs_basenames, select_pdb_rank 
+    
+    pdb_list_save = os.path.abspath("./pdb_rldock.json") 
     json.dump(select_pdb_rank, open(pdb_list_save, "w")) 
