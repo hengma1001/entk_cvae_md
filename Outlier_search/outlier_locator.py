@@ -18,6 +18,7 @@ parser.add_argument("-m", "--md", help="Input: MD simulation directory")
 parser.add_argument("-c", "--cvae", help="Input: CVAE model directory")
 parser.add_argument("-p", "--pdb", help="Input: pdb file") 
 parser.add_argument("-r", "--ref", default=None, help="Input: Reference pdb for RMSD") 
+parser.add_argument("-l", "--rld", help="Input: Path of pdb list from RLDock") 
 
 args = parser.parse_args()
 
@@ -164,7 +165,11 @@ if DEBUG:
     print restart_pdbs
 
 # rank the restart_pdbs according to their RMSD to local state 
-if ref_pdb_file: 
+if os.path.exists(args.rld): 
+    rld_file = open(args.rld, 'r')
+    restart_pdbs = json.load(rld_file)
+    rld_file.close()
+elif ref_pdb_file: 
     outlier_traj = mda.Universe(restart_pdbs[0], restart_pdbs) 
     ref_traj = mda.Universe(ref_pdb_file) 
     R = RMSD(outlier_traj, ref_traj, select='protein and name CA') 
