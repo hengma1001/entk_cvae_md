@@ -128,28 +128,21 @@ def generate_training_pipeline():
                               
             # Add the MD task to the simulating stage
             s1.add_tasks(t1)
-        return s1 
 
-
-    def generate_rldock_stage(): 
-        
-        s = Stage() 
-        s.name = 'RLdock_stage' 
-
+        # create rldock submission process 
         t = Task() 
         t.pre_exec = [] 
         t.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh'] 
         t.pre_exec += ['conda activate %s' % conda_path] 
         t.pre_exec += ['cd %s' % rldock_path] 
         t.executable = ['%s/bin/python' % conda_path] 
-        t.arguments = ['intface_rldock.py', 
+        t.arguments = ['rldock_submit.py', 
                 "--op", "%s/outlier_pdbs" % outlier_path, 
                 "--md", md_path]
+        if not initial_MD: 
+            s1.add_tasks(t) 
 
-        s.add_tasks(t) 
-        s.post_exec = func_on_true() 
-
-        return s 
+        return s1 
 
 
     def generate_aggregating_stage(): 
@@ -251,8 +244,22 @@ def generate_training_pipeline():
                 'thread_type': 'CUDA'
                 }
         s4.add_tasks(t4) 
+
+
+        # create rldock submission process 
+        t = Task() 
+        t.pre_exec = [] 
+        t.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh'] 
+        t.pre_exec += ['conda activate %s' % conda_path] 
+        t.pre_exec += ['cd %s' % rldock_path] 
+        t.executable = ['%s/bin/python' % conda_path] 
+        t.arguments = ['rldock_collect.py', 
+                "--op", "%s/outlier_pdbs" % outlier_path, 
+                "--md", md_path]
+        if not initial_MD: 
+            s4.add_tasks(t) 
+
         s4.post_exec = func_condition 
-        
         return s4
 
 
