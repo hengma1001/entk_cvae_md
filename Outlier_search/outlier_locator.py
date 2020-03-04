@@ -18,7 +18,7 @@ parser.add_argument("-m", "--md", help="Input: MD simulation directory")
 parser.add_argument("-c", "--cvae", help="Input: CVAE model directory")
 parser.add_argument("-p", "--pdb", help="Input: pdb file") 
 parser.add_argument("-r", "--ref", default=None, help="Input: Reference pdb for RMSD") 
-parser.add_argument("-l", "--rld", help="Input: Path of pdb list from RLDock") 
+parser.add_argument("-l", "--rld", help="Input: Json path of pdb list from RLDock") 
 
 args = parser.parse_args()
 

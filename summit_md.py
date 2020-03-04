@@ -36,6 +36,7 @@ md_path = os.path.join(base_path, 'MD_exps/fs-pep')
 agg_path = os.path.join(base_path, 'MD_to_CVAE') 
 cvae_path = os.path.join(base_path, 'CVAE_exps') 
 outlier_path = os.path.join(base_path, 'Outlier_search') 
+rldock_path = os.path.join(base_path, 'RLd_interf') 
 
 pdb_file = os.path.join(md_path, 'pdb/100-fs-peptide-400K.pdb') 
 top_file = None 
@@ -130,6 +131,27 @@ def generate_training_pipeline():
         return s1 
 
 
+    def generate_rldock_stage(): 
+        
+        s = Stage() 
+        s.name = 'RLdock_stage' 
+
+        t = Task() 
+        t.pre_exec = [] 
+        t.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh'] 
+        t.pre_exec += ['conda activate %s' % conda_path] 
+        t.pre_exec += ['cd %s' % rldock_path] 
+        t.executable = ['%s/bin/python' % conda_path] 
+        t.arguments = ['intface_rldock.py', 
+                "--op", "%s/outlier_pdbs" % outlier_path, 
+                "--md", md_path]
+
+        s.add_tasks(t) 
+        s.post_exec = func_on_true() 
+
+        return s 
+
+
     def generate_aggregating_stage(): 
         """ 
         Function to concatenate the MD trajectory (h5 contact map) 
@@ -214,9 +236,9 @@ def generate_training_pipeline():
         t4.arguments = ['outlier_locator.py', 
                 '--md',  md_path, 
                 '--cvae', cvae_path, 
-                '--tica', tica_path, 
                 '--pdb', pdb_file, 
-                '--ref', ref_pdb_file]
+                '--ref', ref_pdb_file, 
+                '--rld', os.path.join(rldock_path, 'pdb_rldock.json')]
 
         t4.cpu_reqs = {'processes': 1,
                            'process_type': None,
@@ -285,8 +307,6 @@ def generate_training_pipeline():
     return p
 
 
-
-
 if __name__ == '__main__':
 
     # Create a dictionary to describe four mandatory keys:
@@ -312,7 +332,6 @@ if __name__ == '__main__':
 
     pipelines = []
     pipelines.append(p1)
-    # pipelines.append(p2)
 
     # Assign the workflow as a list of Pipelines to the Application Manager. In
     # this way, all the pipelines in the list will execute concurrently.
