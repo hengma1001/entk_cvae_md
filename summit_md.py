@@ -212,6 +212,25 @@ def generate_training_pipeline():
         return s3 
 
 
+    def generate_rldock_collect_stage(): 
+        s = Stage() 
+        s.name = 'rldock_collect' 
+
+        # create rldock submission process 
+        t = Task() 
+        t.pre_exec = [] 
+        t.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh'] 
+        t.pre_exec += ['conda activate %s' % conda_path] 
+        t.pre_exec += ['cd %s' % rldock_path] 
+        t.executable = ['%s/bin/python' % conda_path] 
+        t.arguments = ['rldock_collect.py', 
+                "--op", "%s/outlier_pdbs" % outlier_path, 
+                "--md", md_path]
+        if not initial_MD: 
+            s.add_tasks(t) 
+
+        return s 
+
     def generate_interfacing_stage(): 
         s4 = Stage()
         s4.name = 'scanning'
@@ -244,22 +263,9 @@ def generate_training_pipeline():
                 'thread_type': 'CUDA'
                 }
         s4.add_tasks(t4) 
-
-
-        # create rldock submission process 
-        t = Task() 
-        t.pre_exec = [] 
-        t.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh'] 
-        t.pre_exec += ['conda activate %s' % conda_path] 
-        t.pre_exec += ['cd %s' % rldock_path] 
-        t.executable = ['%s/bin/python' % conda_path] 
-        t.arguments = ['rldock_collect.py', 
-                "--op", "%s/outlier_pdbs" % outlier_path, 
-                "--md", md_path]
-        if not initial_MD: 
-            s4.add_tasks(t) 
-
+        
         s4.post_exec = func_condition 
+        
         return s4
 
 
@@ -292,6 +298,11 @@ def generate_training_pipeline():
             s3 = generate_ML_stage(num_ML=N_jobs_ML) 
             # Add the learning stage to the pipeline
             p.add_stages(s3)
+
+
+        # RLdock ranking pdbs
+        s = generate_rldock_collect_stage() 
+        p.add_stages(s) 
 
         # --------------------------
         # Outlier identification stage
@@ -326,7 +337,7 @@ if __name__ == '__main__':
             'walltime': 60 * hrs_wt,
             'cpus'    : N_jobs_MD * 7,
             'gpus'    : N_jobs_MD,#6*2 ,
-            'project' : 'BIP179'
+            'project' : 'lrn005'
     }
 
     # Create Application Manager
