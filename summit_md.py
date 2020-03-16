@@ -244,7 +244,6 @@ def generate_training_pipeline():
 
     def func_on_true(): 
         global CUR_STAGE, MAX_STAGE
-        print 'finishing stage %d of %d' % (CUR_STAGE, MAX_STAGE) 
         
         # --------------------------
         # MD stage
@@ -273,7 +272,7 @@ def generate_training_pipeline():
         CUR_STAGE += 1
 
     def func_on_false(): 
-        print 'Done' 
+        print('Done') 
 
 
     global CUR_STAGE
@@ -300,7 +299,7 @@ if __name__ == '__main__':
             'walltime': 60 * hrs_wt,
             'cpus'    : N_jobs_MD * 7,
             'gpus'    : N_jobs_MD,#6*2 ,
-            'project' : 'BIP179'
+            'project' : proj_id,
     }
 
     # Create Application Manager
