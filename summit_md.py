@@ -1,4 +1,4 @@
-import os, json, time 
+import os, json, time, glob 
 from radical.entk import Pipeline, Stage, Task, AppManager
 
 # ------------------------------------------------------------------------------
@@ -33,20 +33,27 @@ export RADICAL_ENTK_PROFILE=True
 base_path = os.path.abspath('.') # '/gpfs/alpine/proj-shared/bip179/entk/hyperspace/microscope/experiments/'
 conda_path = '/ccs/home/hm0/.conda/envs/omm' 
 
-md_path = os.path.join(base_path, 'MD_exps/fs-pep') 
+md_path = os.path.join(base_path, 'MD_exps/adrp') 
 agg_path = os.path.join(base_path, 'MD_to_CVAE') 
 cvae_path = os.path.join(base_path, 'CVAE_exps') 
+param_path = os.path.join(base_path, 'Parameters') 
 outlier_path = os.path.join(base_path, 'Outlier_search') 
 
-pdb_file = os.path.join(md_path, 'pdb/100-fs-peptide-400K.pdb') 
-top_file = None 
-ref_pdb_file = os.path.join(md_path, 'pdb/fs-peptide.pdb')
+input_path = sorted(glob.glob(os.path.join(param_path, 'input_*')))
+input_prot_path = [path for path in input_path if 'rank' not in path] 
+input_comp_path = [path for path in input_path if 'rank' in path]
+n_comp = len(input_comp_path) 
+
+# pdb_file = os.path.join(md_path, 'pdb/100-fs-peptide-400K.pdb') 
+# top_file = None 
+# ref_pdb_file = os.path.join(md_path, 'pdb/fs-peptide.pdb')
 
 N_jobs_MD = 12 
 N_jobs_ML = 10 
 
 hrs_wt = 2 
 queue = 'batch'
+proj_id = 'bip179'
 
 CUR_STAGE=0
 MAX_STAGE= 10
@@ -80,34 +87,57 @@ def generate_training_pipeline():
         for i in range(num_MD):
             t1 = Task()
             # https://github.com/radical-collaboration/hyperspace/blob/MD/microscope/experiments/MD_exps/fs-pep/run_openmm.py
+
             t1.pre_exec = ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh']
             t1.pre_exec += ['module load cuda/9.1.85']
             t1.pre_exec += ['conda activate %s' % conda_path] 
             t1.pre_exec += ['export PYTHONPATH=%s/MD_exps:$PYTHONPATH' % base_path] 
             t1.pre_exec += ['cd %s' % md_path] 
-            t1.pre_exec += ['mkdir -p omm_runs_%d && cd omm_runs_%d' % (time_stamp+i, time_stamp+i)]
             t1.executable = ['%s/bin/python' % conda_path]  # run_openmm.py
             t1.arguments = ['%s/run_openmm.py' % md_path] 
-            if top_file: 
-                t1.arguments += ['--topol', top_file]
 
+            # specify the pdb_file and top_file for each run  
             # pick initial point of simulation 
-            if initial_MD or i >= len(outlier_list): 
-                t1.arguments += ['--pdb_file', pdb_file] 
-#                 t1.arguments += ['--length', LEN_initial] 
-#                print "Running from initial frame for %d ns. " % LEN_initial
+            if initial_MD and  i >= len(outlier_list): 
+                if i % 2 == 0: 
+                    pdb_file = os.path.join(input_prot_path[0], 'prot.pdb') 
+                    top_file = os.path.join(input_prot_path[0], 'prot.prmtop') 
+                else: 
+                    pdb_file = os.path.join(input_comp_path[i//2%n_comp], 'comp.pdb') 
+                    top_file = os.path.join(input_comp_path[i//2%n_comp], 'comp.prmtop') 
+            # Outlier situation with restarting simulation from pdb file 
             elif outlier_list[i].endswith('pdb'): 
-                t1.arguments += ['--pdb_file', outlier_list[i]] 
-#                 t1.arguments += ['--length', LEN_iter] 
-                t1.pre_exec += ['cp %s ./' % outlier_list[i]]  
-#                print "Running from outlier %s for %d ns" % (outlier_list[i], LEN_iter) 
+                pdb_file = outlier_list[i]
+                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-4])   
+                top_file = glob.glob(sim_path + '/*top')[0] 
+            # Restarting simulation with check point 
             elif outlier_list[i].endswith('chk'): 
-                t1.arguments += ['--pdb_file', pdb_file, 
-                        '-c', outlier_list[i]] 
-#                 t1.arguments += ['--length', LEN_iter]
-                t1.pre_exec += ['cp %s ./' % outlier_list[i]]
-#                print "Running from checkpoint %s for %d ns" % (outlier_list[i], LEN_iter) 
+                check_point = outlier_list[i]
+                t1.arguments += ['-c', check_point] 
+                sim_path = os.path.join(md_path, os.path.basename(check_point)[:-4])
+                pdb_file = glob.glob(sim_path + '/*pdb')[0]
+                top_file = glob.glob(sim_path + '/*top')[0]
+            
+            # add pdb_file and top_file to simulation 
+            ## identify the topology label 
+            top_dirname = os.path.basename(os.path.dirname(top_file))
+            if 'omm_runs' in top_dirname: 
+                top_label = top_dirname.split('_')[2]
+            elif 'input' in top_dirname: 
+                top_label = top_dirname.split('_')[1]
+            else: 
+                raise Exception('Unknow topology file...') 
 
+            # make a copy of everything at local dir 
+            work_dirname = 'omm_runs_%s_%d' % (work_dirname,  time_stamp+i)
+            t1.pre_exec += ['mkdir -p {0} && cd {0}'.format(work_dirname)]
+            t1.pre_exec += ['cp %s ./' % pdb_file] 
+            t1.pre_exec += ['cp %s ./' % top_file] 
+
+            # addd file to simulation 
+            t1.arguments += ['--pdb_file', pdb_file] 
+            t1.arguments += ['--topol', top_file] 
+            
             # how long to run the simulation 
             if initial_MD: 
                 t1.arguments += ['--length', LEN_initial] 
@@ -117,14 +147,14 @@ def generate_training_pipeline():
             # assign hardware the task 
             t1.cpu_reqs = {'processes': 1,
                            'process_type': None,
-                              'threads_per_process': 4,
-                              'thread_type': 'OpenMP'
-                              }
+                           'threads_per_process': 4,
+                           'thread_type': 'OpenMP'
+                          }
             t1.gpu_reqs = {'processes': 1,
                            'process_type': None,
-                              'threads_per_process': 1,
-                              'thread_type': 'CUDA'
-                             }
+                           'threads_per_process': 1,
+                           'thread_type': 'CUDA'
+                          }
                               
             # Add the MD task to the simulating stage
             s1.add_tasks(t1)
