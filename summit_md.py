@@ -53,7 +53,7 @@ N_jobs_ML = 10
 
 hrs_wt = 2 
 queue = 'batch'
-proj_id = 'bip179'
+proj_id = 'med110'
 
 CUR_STAGE=0
 MAX_STAGE= 10
@@ -98,7 +98,7 @@ def generate_training_pipeline():
 
             # specify the pdb_file and top_file for each run  
             # pick initial point of simulation 
-            if initial_MD and  i >= len(outlier_list): 
+            if initial_MD or i >= len(outlier_list): 
                 if i % 2 == 0: 
                     pdb_file = os.path.join(input_prot_path[0], 'prot.pdb') 
                     top_file = os.path.join(input_prot_path[0], 'prot.prmtop') 
@@ -108,7 +108,7 @@ def generate_training_pipeline():
             # Outlier situation with restarting simulation from pdb file 
             elif outlier_list[i].endswith('pdb'): 
                 pdb_file = outlier_list[i]
-                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-4])   
+                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-22])   
                 top_file = glob.glob(sim_path + '/*top')[0] 
             # Restarting simulation with check point 
             elif outlier_list[i].endswith('chk'): 
@@ -129,7 +129,7 @@ def generate_training_pipeline():
                 raise Exception('Unknow topology file...') 
 
             # make a copy of everything at local dir 
-            work_dirname = 'omm_runs_%s_%d' % (work_dirname,  time_stamp+i)
+            work_dirname = 'omm_runs_%s_%d' % (top_label,  time_stamp+i)
             t1.pre_exec += ['mkdir -p {0} && cd {0}'.format(work_dirname)]
             t1.pre_exec += ['cp %s ./' % pdb_file] 
             t1.pre_exec += ['cp %s ./' % top_file] 
