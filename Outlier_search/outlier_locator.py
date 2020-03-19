@@ -89,7 +89,7 @@ else:
 
 # Search the right eps for DBSCAN 
 while True: 
-    outliers = np.squeeze(outliers_from_latent(cm_predict, eps=eps)) 
+    outliers = outliers_from_latent(cm_predict, eps=eps)
     n_outlier = len(outliers) 
     print('dimension = {0}, eps = {1:.2f}, number of outlier found: {2}'.format(
         model_dim, eps, n_outlier))
@@ -98,26 +98,35 @@ while True:
         eps = eps + 0.05 
     else: 
         eps_record[model_best] = eps 
-        outlier_list.append(outliers) 
         break 
 
 ## Unique outliers 
-outlier_list_uni, outlier_count = np.unique(np.hstack(outlier_list), return_counts=True) 
+outlier_list_ranked = outliers_from_latent_ranked(cm_predict, eps=eps) 
+if DEBUG: 
+    print outlier_list_ranked
 ## Save the eps for next iteration 
 with open(eps_record_filepath, 'w') as eps_file: 
         json.dump(eps_record, eps_file) 
 
 if DEBUG: 
-    print outlier_list_uni
+    print outlier_list_ranked
     
 
+# Set up input configurations for next batch of MD simulations 
+# Restart points from outliers in  pdb
 # Write the outliers using MDAnalysis 
 outliers_pdb_path = os.path.abspath('./outlier_pdbs') 
 make_dir_p(outliers_pdb_path) 
 print 'Writing outliers in %s' % outliers_pdb_path  
 
-new_outliers_list = [] 
-for outlier in outlier_list_uni: 
+# Get the pdbs used once already 
+used_pdbs = glob(os.path.join(args.md, 'omm_runs_*/omm_runs_*.pdb'))
+used_pdbs_basenames = [os.path.basename(used_pdb) for used_pdb in used_pdbs ]
+
+# Get sorted pdbs to reinitiate new simulations 
+restart_pdbs = [] 
+outlier_current = [] 
+for outlier in outlier_list_ranked: 
     traj_file, num_frame = find_frame(traj_dict, outlier)  
     outlier_pdb_file = os.path.join(outliers_pdb_path, '{}_{:06d}.pdb'.format(os.path.basename(os.path.dirname(traj_file)), num_frame)) 
     # Only write new pdbs to reduce redundancy. 
@@ -125,24 +134,17 @@ for outlier in outlier_list_uni:
         print 'Found a new outlier# {} at frame {} of {}'.format(outlier, num_frame, traj_file)
         outlier_pdb = write_pdb_frame(traj_file, pdb_file, num_frame, outlier_pdb_file)  
         print '     Written as {}'.format(outlier_pdb_file)
-    new_outliers_list.append(outlier_pdb_file) 
+    # only include unused pdbs to restart list 
+    if os.path.base(outlier_pdb_file) not in used_pdbs_basenames: 
+        restart_pdbs.append(outlier_pdb_file) 
+    outlier_current.append(outlier_pdb_file)
 
 # Clean up outdated outliers 
 outliers_list = glob(os.path.join(outliers_pdb_path, 'omm_runs*.pdb')) 
 for outlier in outliers_list: 
-    if outlier not in new_outliers_list: 
+    if outlier not in outlier_current: 
         print 'Old outlier {} is now connected to a cluster and removing it from the outlier list '.format(os.path.basename(outlier))
         os.rename(outlier, os.path.join(os.path.dirname(outlier), '_'+os.path.basename(outlier))) 
-
-
-# Set up input configurations for next batch of MD simulations 
-## Restarts from pdb
-### Get the pdbs used once already 
-used_pdbs = glob(os.path.join(args.md, 'omm_runs_*/omm_runs_*.pdb'))
-used_pdbs_basenames = [os.path.basename(used_pdb) for used_pdb in used_pdbs ]
-### Exclude the used pdbs 
-outliers_list = glob(os.path.join(outliers_pdb_path, 'omm_runs*.pdb'))
-restart_pdbs = [outlier for outlier in outliers_list if os.path.basename(outlier) not in used_pdbs_basenames] 
 
 ## Restarts from check point 
 used_checkpnts = glob(os.path.join(args.md, 'omm_runs_*/omm_runs_*.chk')) 
@@ -159,7 +161,6 @@ for checkpnt in checkpnt_list:
 if DEBUG: 
     print restart_checkpnts
 
-
 if DEBUG: 
     print restart_pdbs
 
@@ -172,8 +173,6 @@ if ref_pdb_file:
     # Make a dict contains outliers and their RMSD
     # outlier_pdb_RMSD = dict(zip(restart_pdbs, R.rmsd[:,2]))
     restart_pdbs = [pdb for _, pdb in sorted(zip(R.rmsd[:,2], restart_pdbs))] 
-else: 
-    random.shuffle(restart_pdbs) 
 
 
 # Write record for next step 
