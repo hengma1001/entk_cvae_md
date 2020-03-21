@@ -53,7 +53,7 @@ N_jobs_ML = 10
 
 hrs_wt = 2 
 queue = 'batch'
-proj_id = 'med110'
+proj_id = 'med106'
 
 CUR_STAGE=0
 MAX_STAGE= 10
@@ -245,9 +245,7 @@ def generate_training_pipeline():
         t4.arguments = ['outlier_locator.py', 
                 '--md',  md_path, 
                 '--cvae', cvae_path, 
-                '--tica', tica_path, 
-                '--pdb', pdb_file, 
-                '--ref', ref_pdb_file]
+                ]
 
         t4.cpu_reqs = {'processes': 1,
                            'process_type': None,
