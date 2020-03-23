@@ -108,7 +108,7 @@ def generate_training_pipeline():
             # Outlier situation with restarting simulation from pdb file 
             elif outlier_list[i].endswith('pdb'): 
                 pdb_file = outlier_list[i]
-                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-22])   
+                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-11])   
                 top_file = glob.glob(sim_path + '/*top')[0] 
             # Restarting simulation with check point 
             elif outlier_list[i].endswith('chk'): 
@@ -133,6 +133,8 @@ def generate_training_pipeline():
             t1.pre_exec += ['mkdir -p {0} && cd {0}'.format(work_dirname)]
             t1.pre_exec += ['cp %s ./' % pdb_file] 
             t1.pre_exec += ['cp %s ./' % top_file] 
+            if '-c' in t1.pre_exec: 
+                t1.pre_exec += ['cp %s ./' % check_point]
 
             # addd file to simulation 
             t1.arguments += ['--pdb_file', pdb_file] 
