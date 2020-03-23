@@ -1,10 +1,10 @@
 import os, random, json, shutil 
+from glob import glob
 import argparse 
 import numpy as np 
-from glob import glob
 import MDAnalysis as mda
 from utils import read_h5py_file, outliers_from_cvae, cm_to_cvae  
-from utils import predict_from_cvae, outliers_from_latent
+from utils import predict_from_cvae, outliers_from_latent, outliers_from_latent_ranked
 from utils import find_frame, write_pdb_frame, make_dir_p 
 from  MDAnalysis.analysis.rms import RMSD
 
@@ -16,14 +16,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--md", help="Input: MD simulation directory")
 # parser.add_argument("-o", help="output: cvae weight file. (Keras cannot load model directly, will check again...)")
 parser.add_argument("-c", "--cvae", help="Input: CVAE model directory")
-parser.add_argument("-p", "--pdb", help="Input: pdb file") 
+parser.add_argument("-p", "--pdb", default=None, help="Input: pdb file") 
 parser.add_argument("-r", "--ref", default=None, help="Input: Reference pdb for RMSD") 
 
 args = parser.parse_args()
 
 # Pdb file for MDAnalysis 
-pdb_file = os.path.abspath(args.pdb) 
-ref_pdb_file = os.path.abspath(args.ref) 
+if args.pdb: 
+    pdb_file = os.path.abspath(args.pdb) 
+else: 
+    pdb_file = None 
+    # sorted(glob(os.path.join(args.md, 'omm_runs_*/*.pdb')))
+
+if args.pdb: 
+    ref_pdb_file = os.path.abspath(args.ref) 
+else: 
+    ref_pdb_file = None 
 
 # Find the trajectories and contact maps 
 cm_files_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/*_cm.h5')))
@@ -129,13 +137,17 @@ outlier_current = []
 for outlier in outlier_list_ranked: 
     traj_file, num_frame = find_frame(traj_dict, outlier)  
     outlier_pdb_file = os.path.join(outliers_pdb_path, '{}_{:06d}.pdb'.format(os.path.basename(os.path.dirname(traj_file)), num_frame)) 
+    if pdb_file: 
+        pdb_current_file = pdb_file 
+    else: 
+        pdb_current_file = glob(os.path.dirname(traj_file) + '/*pdb')[0]
     # Only write new pdbs to reduce redundancy. 
     if not os.path.exists(outlier_pdb_file): 
         print 'Found a new outlier# {} at frame {} of {}'.format(outlier, num_frame, traj_file)
-        outlier_pdb = write_pdb_frame(traj_file, pdb_file, num_frame, outlier_pdb_file)  
+        outlier_pdb = write_pdb_frame(traj_file, pdb_current_file, num_frame, outlier_pdb_file)  
         print '     Written as {}'.format(outlier_pdb_file)
     # only include unused pdbs to restart list 
-    if os.path.base(outlier_pdb_file) not in used_pdbs_basenames: 
+    if os.path.basename(outlier_pdb_file) not in used_pdbs_basenames: 
         restart_pdbs.append(outlier_pdb_file) 
     outlier_current.append(outlier_pdb_file)
 
