@@ -8,8 +8,8 @@ if len(sys.argv) > 1:
 else: 
     status = 'fail'
 
-print status 
-omm_dirs = glob.glob('MD_exps/fs-pep/omm_runs*') 
+print(status)
+omm_dirs = glob.glob('MD_exps/adrp/omm_runs*') 
 cvae_dirs = glob.glob('CVAE_exps/cvae_runs_*') 
 jsons = glob.glob('Outlier_search/*json') 
 
@@ -34,11 +34,13 @@ for json in jsons:
 if os.path.isdir('Outlier_search/outlier_pdbs'): 
     shutil.move('Outlier_search/outlier_pdbs', outlier_save) 
 
-sandbox_path = '/gpfs/alpine/med106/scratch/hm0/radical.pilot.sandbox' 
-local_entk_path = sorted(glob.glob('re.session.*'))[-1] 
-shutil.move(local_entk_path, result_save) 
-sandbox_src = os.path.join(sandbox_path, local_entk_path) 
-sandbox_dst = os.path.join(result_save, local_entk_path + '_sandbox') 
-shutil.copytree(sandbox_src, sandbox_dst) 
+sandbox_path = '/gpfs/alpine/med110/scratch/hm0/radical.pilot.sandbox' 
+local_entk_path = sorted(glob.glob('re.session.*')) 
+if local_entk_path != []: 
+    local_entk_path = local_entk_path[-1] 
+    shutil.move(local_entk_path, result_save) 
+    sandbox_src = os.path.join(sandbox_path, local_entk_path) 
+    sandbox_dst = os.path.join(result_save, local_entk_path + '_sandbox') 
+    shutil.copytree(sandbox_src, sandbox_dst) 
 
 
