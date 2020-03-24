@@ -18,6 +18,7 @@ parser.add_argument("-m", "--md", help="Input: MD simulation directory")
 parser.add_argument("-c", "--cvae", help="Input: CVAE model directory")
 parser.add_argument("-p", "--pdb", default=None, help="Input: pdb file") 
 parser.add_argument("-r", "--ref", default=None, help="Input: Reference pdb for RMSD") 
+parser.add_argument("-n", "--n_out", default=500, help="Input: Approx number of outliers to gather")  
 
 args = parser.parse_args()
 
@@ -37,6 +38,9 @@ else:
 cm_files_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/*_cm.h5')))
 traj_file_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/*.dcd'))) 
 checkpnt_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/checkpnt.chk'))) 
+
+# Number of outliers to gather 
+n_out = args.n_out
 
 if cm_files_list == []: 
     raise IOError("No h5/traj file found, recheck your input filepath") 
@@ -101,8 +105,8 @@ while True:
     n_outlier = len(outliers) 
     print('dimension = {0}, eps = {1:.2f}, number of outlier found: {2}'.format(
         model_dim, eps, n_outlier))
-    # get up to 1500 outliers 
-    if n_outlier > 1500: 
+    # get outliers 
+    if n_outlier > n_out: 
         eps = eps + 0.05 
     else: 
         eps_record[model_best] = eps 
