@@ -48,19 +48,22 @@ n_comp = len(input_comp_path)
 # top_file = None 
 # ref_pdb_file = os.path.join(md_path, 'pdb/fs-peptide.pdb')
 
-N_jobs_MD = 12 
-N_jobs_ML = 10 
+N_jobs_MD = 240 
+N_jobs_ML = 24 
 
-hrs_wt = 2 
+hrs_wt = 24
 queue = 'batch'
-proj_id = 'med106'
+proj_id = 'med110'
 
 CUR_STAGE=0
 MAX_STAGE= 10
 RETRAIN_FREQ = 5
 
-LEN_initial = 10 # 100
+LEN_initial = 100 # 100
 LEN_iter = 10 
+
+batch_size = 1280
+
 
 def generate_training_pipeline():
     """
@@ -133,7 +136,7 @@ def generate_training_pipeline():
             t1.pre_exec += ['mkdir -p {0} && cd {0}'.format(work_dirname)]
             t1.pre_exec += ['cp %s ./' % pdb_file] 
             t1.pre_exec += ['cp %s ./' % top_file] 
-            if '-c' in t1.pre_exec: 
+            if '-c' in t1.arguments: 
                 t1.pre_exec += ['cp %s ./' % check_point]
 
             # addd file to simulation 
@@ -211,7 +214,8 @@ def generate_training_pipeline():
             t3.executable = ['%s/bin/python' % conda_path]  # train_cvae.py
             t3.arguments = ['%s/train_cvae.py' % cvae_path, 
                     '--h5_file', '%s/cvae_input.h5' % agg_path, 
-                    '--dim', dim] 
+                    '--dim', dim, 
+                    '--batch', batch_size] 
             
             t3.cpu_reqs = {'processes': 1,
                            'process_type': None,
