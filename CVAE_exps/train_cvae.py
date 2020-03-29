@@ -16,7 +16,7 @@ args = parser.parse_args()
 cvae_input = args.f
 hyper_dim = int(args.dim) 
 gpu_id = args.gpu
-batch_size=args.batch
+batch_size = int(args.batch)
 
 if not os.path.exists(cvae_input):
     raise IOError('Input file doesn\'t exist...')
