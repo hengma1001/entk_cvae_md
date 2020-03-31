@@ -48,8 +48,8 @@ n_comp = len(input_comp_path)
 # top_file = None 
 # ref_pdb_file = os.path.join(md_path, 'pdb/fs-peptide.pdb')
 
-N_jobs_MD = 240 
-N_jobs_ML = 24 
+N_jobs_MD = 120 
+N_jobs_ML = 12
 
 hrs_wt = 24
 queue = 'batch'
@@ -62,7 +62,7 @@ RETRAIN_FREQ = 5
 LEN_initial = 100 # 100
 LEN_iter = 10 
 
-batch_size = 1280
+batch_size = 256
 
 
 def generate_training_pipeline():
@@ -182,7 +182,8 @@ def generate_training_pipeline():
         t2.pre_exec += ['cd %s' % agg_path]
         t2.executable = ['%s/bin/python' % conda_path]  # MD_to_CVAE.py
         t2.arguments = ['%s/MD_to_CVAE.py' % agg_path, 
-                '--sim_path', md_path]
+                '--sim_path', md_path, 
+                '--pad', 4]
 
         # Add the aggregation task to the aggreagating stage
         s2.add_tasks(t2)
