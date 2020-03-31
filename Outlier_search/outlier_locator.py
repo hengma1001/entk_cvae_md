@@ -68,7 +68,7 @@ print "Using model {} with loss {}".format(model_best, loss_model_best)
     
 # Convert everything to cvae input 
 cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files_list] 
-cvae_input = cm_to_cvae(cm_data_lists)
+cvae_input = cm_to_cvae(cm_data_lists, padding=4)
 
 # A record of every trajectory length
 train_data_length = [cm_data.shape[1] for cm_data in cm_data_lists]
