@@ -68,5 +68,5 @@ class ContactMapReporter_sel(object):
 
         new_shape = (self._out.shape[1] + 1,) + contact_map.shape 
         self._out.resize(new_shape)
-        self._out[new_shape[1]-1] =contact_map
+        self._out[new_shape[0]-1] =contact_map
         self._file.flush()

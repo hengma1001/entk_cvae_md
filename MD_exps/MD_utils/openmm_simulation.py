@@ -1,3 +1,4 @@
+import json 
 import simtk.openmm.app as app
 import simtk.openmm as omm
 import simtk.unit as u
@@ -396,7 +397,7 @@ def openmm_simulate_amber_npt(pdb_file, top_file,
     simulation.reporters.append(app.DCDReporter(output_traj, report_freq))
     if output_cm:
         if res_file: 
-            res_dict = json.load(open(res_list, 'r')) 
+            res_dict = json.load(open(res_file, 'r')) 
             simulation.reporters.append(ContactMapReporter_sel(output_cm, report_freq, res_dict))
         else: 
             simulation.reporters.append(ContactMapReporter(output_cm, report_freq))

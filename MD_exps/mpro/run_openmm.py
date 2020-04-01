@@ -35,7 +35,7 @@ else:
 # pdb_file = os.path.abspath('./pdb/100-fs-peptide-400K.pdb')
 # ref_pdb_file = os.path.abspath('./pdb/fs-peptide.pdb')
 
-gpu_index = 0 # os.environ["CUDA_VISIBLE_DEVICES"]
+gpu_index = args.gpu # os.environ["CUDA_VISIBLE_DEVICES"]
 
 # check_point = None
 openmm_simulate_amber_npt(pdb_file, top_file,
