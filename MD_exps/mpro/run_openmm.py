@@ -7,6 +7,7 @@ from MD_utils.openmm_simulation import openmm_simulate_amber_npt
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--pdb_file", dest="f", help="pdb file")
 parser.add_argument("-p", "--topol", dest='p', help="topology file")
+parser.add_argument("-r", "--lres", dest='r', help="json file for interested list of residues") 
 parser.add_argument("-c", help="check point file to restart simulation")
 parser.add_argument("-l", "--length", default=10, help="how long (ns) the system will be simulated")
 parser.add_argument("-g", "--gpu", default=0, help="id of gpu to use for the simulation")
@@ -22,6 +23,11 @@ if args.p:
 else: 
     top_file = None 
 
+if args.r: 
+    res_list_file = os.path.abspath(args.r) 
+else: 
+    res_list_file = None 
+
 if args.c: 
     check_point = os.path.abspath(args.c) 
 else: 
@@ -33,7 +39,8 @@ gpu_index = 0 # os.environ["CUDA_VISIBLE_DEVICES"]
 
 # check_point = None
 openmm_simulate_amber_npt(pdb_file, top_file,
-                         check_point = check_point,
+                         res_file=res_list_file, 
+                         check_point=check_point,
                          GPU_index=gpu_index,
                          temperature=310,
                          output_traj="output.dcd",

@@ -4,7 +4,7 @@ import simtk.unit as u
 
 import parmed as pmd
 import random
-from openmm_reporter import ContactMapReporter
+from openmm_reporter import ContactMapReporter, ContactMapReporter_sel 
 
 
 def openmm_simulate_charmm_nvt(top_file, pdb_file, check_point=None, GPU_index=0,  
@@ -322,6 +322,7 @@ def openmm_simulate_charmm_npt_z(top_file, pdb_file, check_point=None, GPU_index
 
 
 def openmm_simulate_amber_npt(pdb_file, top_file, 
+        res_file=None, 
         check_point=None, GPU_index=0,
         output_traj="output.dcd", output_log="output.log", output_cm=None,
         temperature=300*u.kelvin, 
@@ -341,6 +342,14 @@ def openmm_simulate_amber_npt(pdb_file, top_file,
     pdb_file : coordinates file (.gro, .pdb, ...)
         This is the molecule configuration file contains all the atom position
         and PBC (periodic boundary condition) box in the system. 
+
+    res_file : json file (.json) 
+        json file with interested list of residues, dictionary format where 'x' 
+        is the active sites and 'y' is the reference residues
+
+    check_point : check point file (.chk) 
+        Check point from OpenMM storing the state (position/velocity) of the 
+        simulation 
 
     GPU_index : Int or Str 
         The device # of GPU to use for running the simulation. Use Strings, '0,1'
@@ -386,7 +395,11 @@ def openmm_simulate_amber_npt(pdb_file, top_file,
     simulation.context.setVelocitiesToTemperature(10*u.kelvin, random.randint(1, 10000))
     simulation.reporters.append(app.DCDReporter(output_traj, report_freq))
     if output_cm:
-        simulation.reporters.append(ContactMapReporter(output_cm, report_freq))
+        if res_file: 
+            res_dict = json.load(open(res_list, 'r')) 
+            simulation.reporters.append(ContactMapReporter_sel(output_cm, report_freq, res_dict))
+        else: 
+            simulation.reporters.append(ContactMapReporter(output_cm, report_freq))
     simulation.reporters.append(app.StateDataReporter(output_log,
             report_freq, step=True, time=True, speed=True,
             potentialEnergy=True, temperature=True, totalEnergy=True))
