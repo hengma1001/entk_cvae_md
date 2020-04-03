@@ -3,13 +3,13 @@ from glob import glob
 import argparse 
 import numpy as np 
 import MDAnalysis as mda
-from utils import read_h5py_file, outliers_from_cvae, cm_to_cvae  
+from utils import read_h5py_file, outliers_from_cvae, sel_cm_to_cvae  
 from utils import predict_from_cvae, outliers_from_latent, outliers_from_latent_ranked
 from utils import find_frame, write_pdb_frame, make_dir_p 
 from  MDAnalysis.analysis.rms import RMSD
 
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-DEBUG = 1 
+DEBUG = 0 
 
 # Inputs 
 parser = argparse.ArgumentParser()
@@ -68,11 +68,12 @@ print "Using model {} with loss {}".format(model_best, loss_model_best)
     
 # Convert everything to cvae input 
 cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files_list] 
-cvae_input = cm_to_cvae(cm_data_lists, padding=4)
+cvae_input = sel_cm_to_cvae(cm_data_lists, padding=4)
 
 # A record of every trajectory length
-train_data_length = [cm_data.shape[1] for cm_data in cm_data_lists]
+train_data_length = [cm_data.shape[0] for cm_data in cm_data_lists]
 traj_dict = dict(zip(traj_file_list, train_data_length)) 
+print traj_dict 
 
 
 # Outlier search 

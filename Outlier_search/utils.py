@@ -47,6 +47,30 @@ def cm_to_cvae(cm_data_lists, padding=2):
     return cvae_input
 
 
+def sel_cm_to_cvae(cm_data_lists, padding=2): 
+    """
+    A function converting the 2d upper triangle information of contact maps 
+    read from hdf5 file to full contact map and reshape to the format ready 
+    for cvae
+    """
+    cm_all = np.concatenate(cm_data_lists, axis=0)
+
+    # transfer upper triangle to full matrix 
+    # cm_all = np.array([triu_to_full(cm_data) for cm_data in cm_all.T]) 
+
+    # padding if odd dimension occurs in image 
+    pad_f = lambda x: (0,0) if x%padding == 0 else (0,padding-x%padding) 
+    padding_buffer = [(0,0)] 
+    for x in cm_all.shape[1:]: 
+        padding_buffer.append(pad_f(x))
+    cm_all = np.pad(cm_all, padding_buffer, mode='constant')
+
+    # reshape matrix to 4d tensor 
+    cvae_input = cm_all.reshape(cm_all.shape + (1,))   
+    
+    return cvae_input
+
+
 def stamp_to_time(stamp): 
     import datetime
     return datetime.datetime.fromtimestamp(stamp).strftime('%Y-%m-%d %H:%M:%S') 
@@ -120,6 +144,8 @@ def outliers_from_latent_ranked(cm_predict, eps=.5):
     outlier_list = np.array(np.where(db_labels == -1)).flatten()
     core_indices = db.core_sample_indices_
     edgy_pnts = [i for i, label in enumerate(db_labels) if label != -1 and i not in core_indices]
+    if edgy_pnts == []: 
+        edgy_pnts = core_indices
 #     print(2,len(edgy_pnts))
     # distance calculation 
     dist_list = np.empty(len(outlier_list))
