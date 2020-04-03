@@ -9,7 +9,7 @@ else:
     status = 'fail'
 
 print(status)
-omm_dirs = glob.glob('MD_exps/adrp/omm_runs*') 
+omm_dirs = glob.glob('MD_exps/mpro/omm_runs*') 
 cvae_dirs = glob.glob('CVAE_exps/cvae_runs_*') 
 jsons = glob.glob('Outlier_search/*json') 
 
