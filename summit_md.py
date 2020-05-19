@@ -48,10 +48,10 @@ n_comp = len(input_comp_path)
 # top_file = None 
 # ref_pdb_file = os.path.join(md_path, 'pdb/fs-peptide.pdb')
 
-N_jobs_MD = 12 
-N_jobs_ML = 10 
+N_jobs_MD = 120 
+N_jobs_ML = 12
 
-hrs_wt = 2 
+hrs_wt = 24
 queue = 'batch'
 proj_id = 'med110'
 
@@ -59,8 +59,11 @@ CUR_STAGE=0
 MAX_STAGE= 10
 RETRAIN_FREQ = 5
 
-LEN_initial = 10 # 100
+LEN_initial = 100 # 100
 LEN_iter = 10 
+
+batch_size = 256
+
 
 def generate_training_pipeline():
     """
@@ -108,7 +111,7 @@ def generate_training_pipeline():
             # Outlier situation with restarting simulation from pdb file 
             elif outlier_list[i].endswith('pdb'): 
                 pdb_file = outlier_list[i]
-                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-22])   
+                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-11])   
                 top_file = glob.glob(sim_path + '/*top')[0] 
             # Restarting simulation with check point 
             elif outlier_list[i].endswith('chk'): 
@@ -133,6 +136,8 @@ def generate_training_pipeline():
             t1.pre_exec += ['mkdir -p {0} && cd {0}'.format(work_dirname)]
             t1.pre_exec += ['cp %s ./' % pdb_file] 
             t1.pre_exec += ['cp %s ./' % top_file] 
+            if '-c' in t1.arguments: 
+                t1.pre_exec += ['cp %s ./' % check_point]
 
             # addd file to simulation 
             t1.arguments += ['--pdb_file', pdb_file] 
@@ -177,7 +182,8 @@ def generate_training_pipeline():
         t2.pre_exec += ['cd %s' % agg_path]
         t2.executable = ['%s/bin/python' % conda_path]  # MD_to_CVAE.py
         t2.arguments = ['%s/MD_to_CVAE.py' % agg_path, 
-                '--sim_path', md_path]
+                '--sim_path', md_path, 
+                '--pad', 4]
 
         # Add the aggregation task to the aggreagating stage
         s2.add_tasks(t2)
@@ -209,7 +215,8 @@ def generate_training_pipeline():
             t3.executable = ['%s/bin/python' % conda_path]  # train_cvae.py
             t3.arguments = ['%s/train_cvae.py' % cvae_path, 
                     '--h5_file', '%s/cvae_input.h5' % agg_path, 
-                    '--dim', dim] 
+                    '--dim', dim, 
+                    '--batch', batch_size] 
             
             t3.cpu_reqs = {'processes': 1,
                            'process_type': None,
@@ -245,9 +252,7 @@ def generate_training_pipeline():
         t4.arguments = ['outlier_locator.py', 
                 '--md',  md_path, 
                 '--cvae', cvae_path, 
-                '--tica', tica_path, 
-                '--pdb', pdb_file, 
-                '--ref', ref_pdb_file]
+                ]
 
         t4.cpu_reqs = {'processes': 1,
                            'process_type': None,
