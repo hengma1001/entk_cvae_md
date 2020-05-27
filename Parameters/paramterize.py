@@ -2,6 +2,7 @@ import os
 import glob 
 # import json 
 import shutil
+from tqdm import tqdm
 import MDAnalysis as mda 
 
 from comp_sim.utils import only_protein, align_to_template
@@ -15,7 +16,7 @@ prot_files = [pdb for pdb in pdb_files if only_protein(pdb)]
 
 ref_pdb = prot_files[0]
 info_list = []
-for pdb in pdb_files: 
+for pdb in tqdm(pdb_files): 
     pdb_code = os.path.basename(pdb)[:-4] 
     work_dir = os.path.join(host_dir, 'input_' + pdb_code) 
     os.makedirs(work_dir, exist_ok=True) 
@@ -28,7 +29,6 @@ for pdb in pdb_files:
         info = ParameterizeAMBER_prot(pdb_copy)
     else: 
         info = ParameterizeAMBER_comp2(pdb_copy) 
-    print(info) 
     info_list.append(info)
     os.chdir(host_dir) 
 

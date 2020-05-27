@@ -40,27 +40,31 @@ param_path = os.path.join(base_path, 'Parameters')
 outlier_path = os.path.join(base_path, 'Outlier_search') 
 
 input_path = sorted(glob.glob(os.path.join(param_path, 'input_*')))
-input_prot_path = [path for path in input_path if 'rank' not in path] 
-input_comp_path = [path for path in input_path if 'rank' in path]
+input_prot_path = [path for path in input_path if 'db' not in path] 
+input_comp_path = [path for path in input_path if 'db' in path]
 n_comp = len(input_comp_path) 
 
 # pdb_file = os.path.join(md_path, 'pdb/100-fs-peptide-400K.pdb') 
 # top_file = None 
 # ref_pdb_file = os.path.join(md_path, 'pdb/fs-peptide.pdb')
 
-N_jobs_MD = 12 
-N_jobs_ML = 10 
+N_jobs_MD = 1200 # 240
+N_jobs_ML = 12
+run_per_comp = 5 # int(N_jobs_MD//n_comp) 
 
-hrs_wt = 2 
+hrs_wt = 24
 queue = 'batch'
 proj_id = 'med110'
 
 CUR_STAGE=0
-MAX_STAGE= 10
+MAX_STAGE= 1#10
 RETRAIN_FREQ = 5
 
-LEN_initial = 10 # 100
+LEN_initial = 100
 LEN_iter = 10 
+
+batch_size = 256
+
 
 def generate_training_pipeline():
     """
@@ -99,16 +103,16 @@ def generate_training_pipeline():
             # specify the pdb_file and top_file for each run  
             # pick initial point of simulation 
             if initial_MD or i >= len(outlier_list): 
-                if i % 2 == 0: 
+                if i >= n_comp * run_per_comp: 
                     pdb_file = os.path.join(input_prot_path[0], 'prot.pdb') 
                     top_file = os.path.join(input_prot_path[0], 'prot.prmtop') 
                 else: 
-                    pdb_file = os.path.join(input_comp_path[i//2%n_comp], 'comp.pdb') 
-                    top_file = os.path.join(input_comp_path[i//2%n_comp], 'comp.prmtop') 
+                    pdb_file = os.path.join(input_comp_path[i%n_comp], 'relaxed.pdb') 
+                    top_file = os.path.join(input_comp_path[i%n_comp], 'comp.prmtop') 
             # Outlier situation with restarting simulation from pdb file 
             elif outlier_list[i].endswith('pdb'): 
                 pdb_file = outlier_list[i]
-                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-22])   
+                sim_path = os.path.join(md_path, os.path.basename(pdb_file)[:-11])   
                 top_file = glob.glob(sim_path + '/*top')[0] 
             # Restarting simulation with check point 
             elif outlier_list[i].endswith('chk'): 
@@ -133,6 +137,8 @@ def generate_training_pipeline():
             t1.pre_exec += ['mkdir -p {0} && cd {0}'.format(work_dirname)]
             t1.pre_exec += ['cp %s ./' % pdb_file] 
             t1.pre_exec += ['cp %s ./' % top_file] 
+            if '-c' in t1.arguments: 
+                t1.pre_exec += ['cp %s ./' % check_point]
 
             # addd file to simulation 
             t1.arguments += ['--pdb_file', pdb_file] 
@@ -177,7 +183,8 @@ def generate_training_pipeline():
         t2.pre_exec += ['cd %s' % agg_path]
         t2.executable = ['%s/bin/python' % conda_path]  # MD_to_CVAE.py
         t2.arguments = ['%s/MD_to_CVAE.py' % agg_path, 
-                '--sim_path', md_path]
+                '--sim_path', md_path, 
+                '--pad', 4]
 
         # Add the aggregation task to the aggreagating stage
         s2.add_tasks(t2)
@@ -209,7 +216,8 @@ def generate_training_pipeline():
             t3.executable = ['%s/bin/python' % conda_path]  # train_cvae.py
             t3.arguments = ['%s/train_cvae.py' % cvae_path, 
                     '--h5_file', '%s/cvae_input.h5' % agg_path, 
-                    '--dim', dim] 
+                    '--dim', dim, 
+                    '--batch', batch_size] 
             
             t3.cpu_reqs = {'processes': 1,
                            'process_type': None,
@@ -245,9 +253,7 @@ def generate_training_pipeline():
         t4.arguments = ['outlier_locator.py', 
                 '--md',  md_path, 
                 '--cvae', cvae_path, 
-                '--tica', tica_path, 
-                '--pdb', pdb_file, 
-                '--ref', ref_pdb_file]
+                ]
 
         t4.cpu_reqs = {'processes': 1,
                            'process_type': None,
@@ -275,6 +281,7 @@ def generate_training_pipeline():
     def func_on_true(): 
         global CUR_STAGE, MAX_STAGE
         
+        # if CUR_STAGE != 0: 
         # --------------------------
         # MD stage
         s1 = generate_MD_stage(num_MD=N_jobs_MD)

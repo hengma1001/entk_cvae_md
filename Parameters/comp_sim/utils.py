@@ -71,8 +71,9 @@ def run_at_temp(func):
         current_dir = os.getcwd()
         temp_path = tempfile.TemporaryDirectory() 
         os.chdir(temp_path.name) 
-        func(*args, **kwargs)
+        output = func(*args, **kwargs)
         os.chdir(current_dir) 
+        return output
     return wrapper
 
 
