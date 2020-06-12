@@ -1,15 +1,16 @@
 import os, random, json, shutil 
+import h5py
 from glob import glob
 import argparse 
 import numpy as np 
 import MDAnalysis as mda
-from utils import read_h5py_file, outliers_from_cvae, cm_to_cvae  
-from utils import predict_from_cvae, outliers_from_latent, outliers_from_latent_ranked
+from utils import outliers_from_cvae, cm_to_cvae  
+from utils import predict_from_cvae, outliers_from_latent_loc
 from utils import find_frame, write_pdb_frame, make_dir_p 
 from  MDAnalysis.analysis.rms import RMSD
 
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-DEBUG = 1 
+DEBUG = 0 
 
 # Inputs 
 parser = argparse.ArgumentParser()
@@ -66,14 +67,16 @@ for i in range(len(model_weights)):
 
 print "Using model {} with loss {}".format(model_best, loss_model_best) 
     
-# Convert everything to cvae input 
-cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files_list] 
-cvae_input = cm_to_cvae(cm_data_lists, padding=4)
 
-# A record of every trajectory length
-train_data_length = [cm_data.shape[1] for cm_data in cm_data_lists]
+# Identify the latent dimensions 
+model_dim = int(os.path.basename(os.path.dirname(model_best))[10:12]) 
+print 'Model latent dimension: %d' % model_dim  
+
+# Get the predicted embeddings 
+cm_predict, train_data_length = predict_from_cvae(model_best, cm_files_list, hyper_dim=model_dim) 
+print cm_predict.shape
+
 traj_dict = dict(zip(traj_file_list, train_data_length)) 
-
 
 # Outlier search 
 outlier_list = [] 
@@ -87,12 +90,6 @@ if os.path.exists(eps_record_filepath):
 else: 
     eps_record = {} 
 
-# for model_weight in model_weights: 
-# Identify the latent dimensions 
-model_dim = int(os.path.basename(os.path.dirname(model_best))[10:12]) 
-print 'Model latent dimension: %d' % model_dim  
-# Get the predicted embeddings 
-cm_predict = predict_from_cvae(model_best, cvae_input, hyper_dim=model_dim) 
 # initialize eps if empty 
 if str(model_best) in eps_record.keys(): 
     eps = eps_record[model_best] 
@@ -195,7 +192,6 @@ if ref_pdb_file:
 ## 1> restarting checkpoint; 2> unused outliers (ranked); 3> used outliers (shuffled) 
 random.shuffle(used_pdbs) 
 restart_points = restart_checkpnts + restart_pdbs + used_pdbs  
-print restart_points 
 
 restart_points_filepath = os.path.abspath('./restart_points.json') 
 with open(restart_points_filepath, 'w') as restart_file: 
