@@ -3,9 +3,11 @@ import numpy as np
 import h5py 
 import errno 
 import MDAnalysis as mda 
+from tqdm import tqdm
 from cvae.CVAE import CVAE
 from keras import backend as K 
 from sklearn.cluster import DBSCAN 
+from sklearn.neighbors import LocalOutlierFactor 
 
 def triu_to_full(cm0):
     num_res = int(np.ceil((len(cm0) * 2) ** 0.5))
@@ -18,21 +20,14 @@ def triu_to_full(cm0):
     return cm_full
 
 
-def read_h5py_file(h5_file): 
-    cm_h5 = h5py.File(h5_file, 'r', libver='latest', swmr=True)
-    return cm_h5[u'contact_maps'] 
-
-
-def cm_to_cvae(cm_data_lists, padding=2): 
+def cm_to_cvae(cm_data, padding=2): 
     """
     A function converting the 2d upper triangle information of contact maps 
     read from hdf5 file to full contact map and reshape to the format ready 
     for cvae
     """
-    cm_all = np.hstack(cm_data_lists)
-
     # transfer upper triangle to full matrix 
-    cm_data_full = np.array([triu_to_full(cm_data) for cm_data in cm_all.T]) 
+    cm_data_full = np.array([triu_to_full(cm) for cm in cm_data.T])
 
     # padding if odd dimension occurs in image 
     pad_f = lambda x: (0,0) if x%padding == 0 else (0,padding-x%padding) 
@@ -93,18 +88,47 @@ def outliers_from_cvae(model_weight, cvae_input, hyper_dim=3, eps=0.35):
     return outlier_list
 
 
-def predict_from_cvae(model_weight, cvae_input, hyper_dim=3): 
+def predict_from_cvae(model_weight, cm_files, hyper_dim=3): 
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]=str(0)  
+    # decoy run to identify cvae input shape 
+    cm_h5 = h5py.File(cm_files[0], 'r', libver='latest', swmr=True)
+    cm_data = cm_h5[u'contact_maps']
+    cvae_input = cm_to_cvae(np.array(cm_data), padding=4)
     cvae = CVAE(cvae_input.shape[1:], hyper_dim) 
+    cm_h5.close()
+    # load weight 
     cvae.model.load_weights(model_weight)
-    cm_predict = cvae.return_embeddings(cvae_input) 
+    train_data_length = []
+    cm_predict = [] 
+    for i, cm_file in enumerate(cm_files[:]): 
+        # Convert everything to cvae input
+        cm_h5 = h5py.File(cm_file, 'r', libver='latest', swmr=True)
+        cm_data = cm_h5[u'contact_maps']
+        cvae_input = cm_to_cvae(np.array(cm_data), padding=4)
+        cm_h5.close()
+
+        # A record of every trajectory length
+        train_data_length += [cvae_input.shape[0]]
+        # Get the predicted embeddings 
+        embeddings = cvae.return_embeddings(cvae_input) 
+        cm_predict.append(embeddings) 
+        print embeddings.shape, i
+
+    cm_predict = np.vstack(cm_predict) 
+    # clean up the keras session
     del cvae 
     K.clear_session()
-    return cm_predict
+    return cm_predict, train_data_length
 
 
-def outliers_from_latent(cm_predict, eps=0.35): 
+def outliers_from_latent_loc(cm_predict, n_outliers=500, n_jobs=8): 
+    clf = LocalOutlierFactor(n_neighbors=20, novelty=True, n_jobs=n_jobs).fit(cm_predict) 
+    # label = clf.predict(cm_predict) 
+    return np.argsort(clf.negative_outlier_factor_)[:n_outliers]
+
+    
+def outliers_from_latent_dbscan(cm_predict, eps=0.35): 
     db = DBSCAN(eps=eps, min_samples=10).fit(cm_predict)
     db_label = db.labels_
     outlier_list = np.array(np.where(db_label == -1)).flatten()
