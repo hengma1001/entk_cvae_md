@@ -36,12 +36,12 @@ else:
     ref_pdb_file = None 
 
 # Find the trajectories and contact maps 
-cm_files_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/*_cm.h5')))
-traj_file_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/*.dcd'))) 
-checkpnt_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/checkpnt.chk'))) 
+cm_files_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/*_cm.h5')))[:]
+traj_file_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/*.dcd')))[:]
+checkpnt_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/checkpnt.chk')))[:] 
 
 # Number of outliers to gather 
-n_out = args.n_out
+n_outliers = args.n_out
 
 if cm_files_list == []: 
     raise IOError("No h5/traj file found, recheck your input filepath") 
@@ -78,48 +78,12 @@ print cm_predict.shape
 
 traj_dict = dict(zip(traj_file_list, train_data_length)) 
 
+# raise Exception('prediction finished') 
+
 # Outlier search 
-outlier_list = [] 
-
-## eps records for next iteration 
-eps_record_filepath = './eps_record.json' 
-if os.path.exists(eps_record_filepath): 
-    eps_file = open(eps_record_filepath, 'r')
-    eps_record = json.load(eps_file) 
-    eps_file.close() 
-else: 
-    eps_record = {} 
-
-# initialize eps if empty 
-if str(model_best) in eps_record.keys(): 
-    eps = eps_record[model_best] 
-else: 
-    eps = 0.2 
-
-# Search the right eps for DBSCAN 
-while True: 
-    outliers = outliers_from_latent(cm_predict, eps=eps)
-    n_outlier = len(outliers) 
-    print('dimension = {0}, eps = {1:.2f}, number of outlier found: {2}'.format(
-        model_dim, eps, n_outlier))
-    # get outliers 
-    if n_outlier > n_out: 
-        eps = eps + 0.05 
-    else: 
-        eps_record[model_best] = eps 
-        break 
-
-## Unique outliers 
-outlier_list_ranked = outliers_from_latent_ranked(cm_predict, eps=eps) 
-if DEBUG: 
-    print outlier_list_ranked
-## Save the eps for next iteration 
-with open(eps_record_filepath, 'w') as eps_file: 
-        json.dump(eps_record, eps_file) 
-
-if DEBUG: 
-    print outlier_list_ranked
-    
+print "Starting outlier searching..."
+outlier_list_ranked = outliers_from_latent_loc(cm_predict, n_outliers=n_outliers)  
+print "Done outlier searching..."
 
 # Set up input configurations for next batch of MD simulations 
 # Restart points from outliers in  pdb
@@ -166,7 +130,7 @@ for checkpnt in checkpnt_list:
     checkpnt_filepath = os.path.join(outliers_pdb_path, os.path.basename(os.path.dirname(checkpnt) + '.chk'))
     if not os.path.exists(checkpnt_filepath): 
         shutil.copy2(checkpnt, checkpnt_filepath) 
-        print [os.path.basename(os.path.dirname(checkpnt)) in outlier for outlier in outliers_list] 
+        # print [os.path.basename(os.path.dirname(checkpnt)) in outlier for outlier in outliers_list] 
         # includes only checkpoint of trajectory that contains an outlier 
         if any(os.path.basename(os.path.dirname(checkpnt)) in outlier for outlier in outliers_list):  
             restart_checkpnts.append(checkpnt_filepath) 

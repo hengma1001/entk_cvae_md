@@ -2,6 +2,7 @@ import os
 import numpy as np
 import h5py 
 import errno 
+import time 
 import MDAnalysis as mda 
 from tqdm import tqdm
 from cvae.CVAE import CVAE
@@ -113,7 +114,8 @@ def predict_from_cvae(model_weight, cm_files, hyper_dim=3):
         # Get the predicted embeddings 
         embeddings = cvae.return_embeddings(cvae_input) 
         cm_predict.append(embeddings) 
-        print embeddings.shape, i
+#         if i % 10 == 0: 
+#             print embeddings.shape, i, stamp_to_time(time.time())
 
     cm_predict = np.vstack(cm_predict) 
     # clean up the keras session
