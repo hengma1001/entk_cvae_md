@@ -57,7 +57,7 @@ queue = 'batch'
 proj_id = 'med110'
 
 CUR_STAGE=0
-MAX_STAGE= 1#10
+MAX_STAGE= 10
 RETRAIN_FREQ = 5
 
 LEN_initial = 100

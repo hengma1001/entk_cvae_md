@@ -49,11 +49,11 @@ def CVAE(input_shape, latent_dim=3):
     autoencoder.model.summary()
     return autoencoder
 
-def run_cvae(gpu_id, cm_file, hyper_dim=3, epochs=100, batch_size=128): 
+def run_cvae(gpu_id, cm_file, hyper_dim=3, epochs=100, batch_size=128, skip=1): 
     # read contact map from h5 file 
     cm_h5 = h5py.File(cm_file, 'r', libver='latest', swmr=True)
     cm_data_input = cm_h5[u'contact_maps'].value 
-    cm_data_input = cm_data_input[::2]
+    cm_data_input = cm_data_input[::skip]
 
     # splitting data into train and validation
     np.random.shuffle(cm_data_input) 

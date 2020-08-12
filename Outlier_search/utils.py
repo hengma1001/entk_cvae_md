@@ -3,6 +3,7 @@ import numpy as np
 import h5py 
 import errno 
 import time 
+import datetime
 import MDAnalysis as mda 
 from tqdm import tqdm
 from cvae.CVAE import CVAE
@@ -44,7 +45,6 @@ def cm_to_cvae(cm_data, padding=2):
 
 
 def stamp_to_time(stamp): 
-    import datetime
     return datetime.datetime.fromtimestamp(stamp).strftime('%Y-%m-%d %H:%M:%S') 
     
 
@@ -114,20 +114,39 @@ def predict_from_cvae(model_weight, cm_files, hyper_dim=3):
         # Get the predicted embeddings 
         embeddings = cvae.return_embeddings(cvae_input) 
         cm_predict.append(embeddings) 
-#         if i % 10 == 0: 
-#             print embeddings.shape, i, stamp_to_time(time.time())
+        # if i % 10 == 0: 
+        #     print embeddings.shape, i, stamp_to_time(time.time())
 
     cm_predict = np.vstack(cm_predict) 
+    # cm_predict is now the indices of first 500 outliers 
+#     cm_predict = outliers_from_latent_loc(cm_predict)
     # clean up the keras session
     del cvae 
     K.clear_session()
     return cm_predict, train_data_length
 
 
-def outliers_from_latent_loc(cm_predict, n_outliers=500, n_jobs=8): 
+def outliers_largeset(cm_predict, n_outliers=500, n_jobs=1): 
+    indices_10 = []
+    scores_10 = []
+    for i in range(10): 
+        cm_predict_loc = cm_predict[i::10] 
+        indices_1, score_1 = outliers_from_latent_loc(cm_predict_loc, n_outliers=n_outliers, n_jobs=n_jobs) 
+        indices_10.append(indices_1 * 10 + 1) 
+        scores_10.append(score_1) 
+    indices = np.hstack(indices_10) 
+    scores = np.hstack(scores_10) 
+    ranked_indices = np.argsort(scores)[:n_outliers] 
+    ranked_scores = scores[ranked_indices] 
+    return ranked_indices, ranked_scores
+        
+
+def outliers_from_latent_loc(cm_predict, n_outliers=500, n_jobs=1): 
     clf = LocalOutlierFactor(n_neighbors=20, novelty=True, n_jobs=n_jobs).fit(cm_predict) 
     # label = clf.predict(cm_predict) 
-    return np.argsort(clf.negative_outlier_factor_)[:n_outliers]
+    sort_indices = np.argsort(clf.negative_outlier_factor_)[:n_outliers]
+    sort_scores = clf.negative_outlier_factor_[sort_indices] 
+    return sort_indices, sort_scores
 
     
 def outliers_from_latent_dbscan(cm_predict, eps=0.35): 

@@ -5,7 +5,7 @@ import argparse
 import numpy as np 
 import MDAnalysis as mda
 from utils import outliers_from_cvae, cm_to_cvae  
-from utils import predict_from_cvae, outliers_from_latent_loc
+from utils import predict_from_cvae, outliers_from_latent_loc, outliers_from_latent_dbscan, outliers_largeset
 from utils import find_frame, write_pdb_frame, make_dir_p 
 from  MDAnalysis.analysis.rms import RMSD
 
@@ -74,16 +74,20 @@ print 'Model latent dimension: %d' % model_dim
 
 # Get the predicted embeddings 
 cm_predict, train_data_length = predict_from_cvae(model_best, cm_files_list, hyper_dim=model_dim) 
-print cm_predict.shape
+# print cm_predict.shape
 
 traj_dict = dict(zip(traj_file_list, train_data_length)) 
+print traj_dict 
 
 # raise Exception('prediction finished') 
+np.save('cm_predict.npy', cm_predict) 
 
-# Outlier search 
+
+## Unique outliers 
 print "Starting outlier searching..."
-outlier_list_ranked = outliers_from_latent_loc(cm_predict, n_outliers=n_outliers)  
+outlier_list_ranked, _ = outliers_largeset(cm_predict, n_outliers=n_outliers, n_jobs=42)  
 print "Done outlier searching..."
+print outlier_list_ranked
 
 # Set up input configurations for next batch of MD simulations 
 # Restart points from outliers in  pdb

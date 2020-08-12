@@ -27,7 +27,7 @@ if cm_files == []:
 cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files] 
 
 # Compress all .h5 files into one in cvae format 
-cvae_input = cm_to_cvae(cm_data_lists, padding=padding)
+cvae_input = cm_to_cvae(cm_data_lists, padding=padding, skip=10)
 
 
 # Create .h5 as cvae input
