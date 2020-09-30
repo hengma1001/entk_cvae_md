@@ -66,7 +66,7 @@ def openmm_simulate_amber_implicit(
     # set up save dir for simulation results 
     work_dir = os.getcwd() 
     time_label = int(time.time())
-    omm_path = create_md_path(time_label) 
+    omm_path = create_md_path(time_label, output_cm) 
     print(f"Running simulation at {omm_path}")
 
     # setting up running path  
