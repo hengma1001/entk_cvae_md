@@ -40,7 +40,7 @@ import uuid
 import subprocess
 
 class CopySender:
-    def __init__(self,, target, method='cp'):
+    def __init__(self, target, method='cp'):
         self.method = method
         self.target = target
         self.processes = []
@@ -53,12 +53,15 @@ class CopySender:
 def write_contact_map_h5(file_name, rows, cols):
 
     # Helper function to create ragged array
-    ragged = lambda data: np.array(data, dtype=object)
+    def ragged(data):
+        a = np.empty(len(data), dtype=object)
+        a[...] = data
+        return a
 
     # Specify variable length arrays
     dt = h5py.vlen_dtype(np.dtype('int16'))
 
-    with open_h5(file_name, 'w', swmr=False) as h5_file:
+    with h5py.File(file_name, 'w', swmr=False) as h5_file:
         # list of np arrays of shape (2 * X) where X varies
         data = ragged([np.concatenate(row_col) for row_col in zip(rows, cols)])
         h5_file.create_dataset('contact_map',
@@ -69,8 +72,10 @@ def write_contact_map_h5(file_name, rows, cols):
 
 class SparseContactMapReporter:
 
-    def __init__(self, file, reportInterval, native_pdb,
-                 selection='CA', threshold=8., batch_size=1024,
+    def __init__(self, file, reportInterval,
+                 selection='CA',
+                 threshold=8.,
+                 batch_size=2,#1024,
                  senders=[]):
 
         self._file_idx = 0
@@ -89,9 +94,6 @@ class SparseContactMapReporter:
         # Row, Column indices for contact matrix in COO format
         self._rows, self._cols = [], []
 
-    def __del__(self):
-        self._file.close()
-
     def describeNextReport(self, simulation):
         steps = self._report_interval - simulation.currentStep % self._report_interval
         return (steps, True, False, False, False, None)
@@ -106,7 +108,7 @@ class SparseContactMapReporter:
         self._rows.append(coo.row.astype('int16'))
         self._cols.append(coo.col.astype('int16'))
 
-    def _report(self, simulation, state):
+    def report(self, simulation, state):
         atom_indices = [a.index for a in simulation.topology.atoms() if a.name == self._selection]
         all_positions = np.array(state.getPositions().value_in_unit(u.angstrom))
         positions = all_positions[atom_indices].astype(np.float32)
@@ -115,7 +117,7 @@ class SparseContactMapReporter:
 
         self._num_frames += 1
 
-        if self._num_frames == batch_size:
+        if self._num_frames == self._batch_size:
             file_name = f'{self._base_name}_{self._file_idx:05d}_{uuid.uuid4()}.h5'
             write_contact_map_h5(file_name, self._rows, self._cols)
             self._init_batch()
@@ -123,3 +125,4 @@ class SparseContactMapReporter:
 
             for sender in self._senders:
                 sender.send(file_name)
+

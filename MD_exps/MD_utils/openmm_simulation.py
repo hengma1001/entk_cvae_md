@@ -10,7 +10,9 @@ import simtk.openmm.app as app
 import simtk.openmm as omm
 import simtk.unit as u
 
-from MD_utils.openmm_reporter import ContactMapReporter
+from MD_utils.openmm_reporter import (ContactMapReporter,
+                                      SparseContactMapReporter,
+                                      CopySender)
 from MD_utils.utils import create_md_path, touch_file
 
 
@@ -113,8 +115,15 @@ def openmm_simulate_amber_implicit(
     # setting up reports 
     report_freq = int(report_time/dt)
     simulation.reporters.append(app.DCDReporter(output_traj, report_freq))
-    if output_cm:
+    if output_cm is None:
+        pass
+    elif output_cm.endswith('h5'):
         simulation.reporters.append(ContactMapReporter(output_cm, report_freq))
+    else:
+        sender = CopySender(target='../h5_out/', method='cp')
+        simulation.reporters.append(SparseContactMapReporter(output_cm, report_freq,
+                                                             senders=[sender]))
+
     simulation.reporters.append(app.StateDataReporter(output_log,
             report_freq, step=True, time=True, speed=True,
             potentialEnergy=True, temperature=True, totalEnergy=True))
