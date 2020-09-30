@@ -121,8 +121,9 @@ def openmm_simulate_amber_implicit(
         pass
     elif output_cm.endswith('h5'):
         simulation.reporters.append(ContactMapReporter(output_cm, report_freq))
-    else:
-        simulation.reporters.append(SparseContactMapReporter(os.path.join(omm_path, output_cm, output_cm),
+    else: 
+        file_prefix = os.path.join(os.path.abspath('.'), output_cm, output_cm)
+        simulation.reporters.append(SparseContactMapReporter(file_prefix,
                                                              report_freq,
                                                              senders=senders))
 
@@ -282,7 +283,8 @@ def openmm_simulate_amber_explicit(
     elif output_cm.endswith('h5'):
         simulation.reporters.append(ContactMapReporter(output_cm, report_freq))
     else:
-        simulation.reporters.append(SparseContactMapReporter(os.path.join(omm_path, output_cm, output_cm),
+        file_prefix = os.path.join(os.path.abspath('.'), output_cm, output_cm)
+        simulation.reporters.append(SparseContactMapReporter(file_prefix,
                                                              report_freq,
                                                              senders=senders))
 

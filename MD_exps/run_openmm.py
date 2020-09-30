@@ -31,7 +31,14 @@ else:
 if args.c: 
     check_point = os.path.abspath(args.c)
 else: 
-    check_point = None 
+    check_point = None
+
+if args.cp_path:
+    cp_path = os.path.abspath(args.cp_path)
+else:
+    cp_path = None
+
+
 # pdb_file = os.path.abspath('./pdb/100-fs-peptide-400K.pdb')
 # ref_pdb_file = os.path.abspath('./pdb/fs-peptide.pdb')
 
@@ -47,9 +54,9 @@ if args.scp_path is not None:
     identity_file = os.environ['MEDULLA_IDENTITY_FILE']
     senders.append(CopySender(args.scp_path, method='scp -i {identity_file}'))
 
-if args.cp_path is not None:
+if cp_path is not None:
     # Send HDF5 files to any local path
-    senders.append(CopySender(args.cp_path, method='cp'))
+    senders.append(CopySender(cp_path, method='cp'))
 
 # check_point = None
 openmm_simulate_amber_implicit(
