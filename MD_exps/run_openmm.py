@@ -9,8 +9,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--pdb_file", dest="f", help="pdb file")
 parser.add_argument("-p", "--topol", dest='p', help="topology file")
 parser.add_argument("-c", help="check point file to restart simulation")
-parser.add_argument("-cm", "--cm_output", default=None, help="If name ends with .h5 will write a single HDF5 file." \
-                                                             "Otherwise will write many with this name prefix")
+parser.add_argument("-cm", "--cm_output", default="output_cm.h5",
+                    help="If name ends with .h5 will write a single HDF5 file." \
+                         "Otherwise will write many with this name prefix")
 parser.add_argument("-scp", "--scp_path", default=None, help="Path to scp HDF5 files to")
 parser.add_argument("-cp", "--cp_path", default=None, help="Path to cp HDF5 files to")
 parser.add_argument("-l", "--length", default=10, help="how long (ns) the system will be simulated")
