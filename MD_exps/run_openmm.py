@@ -51,8 +51,10 @@ senders = []
 if args.scp_path is not None:
     # Send HDF5 files to medulla
     # Requires user to execute "export MEDULLA_IDENTITY_FILE=~/.ssh/my-identity-file"
-    identity_file = os.environ['MEDULLA_IDENTITY_FILE']
-    senders.append(CopySender(args.scp_path, method='scp -i {identity_file}'))
+    # identity_file = os.environ['MEDULLA_IDENTITY_FILE']
+    # method = f'scp -i {identity_file}'
+    method = 'scp'
+    senders.append(CopySender(args.scp_path, method=method))
 
 if cp_path is not None:
     # Send HDF5 files to any local path
