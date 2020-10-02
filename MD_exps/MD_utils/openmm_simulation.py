@@ -10,7 +10,8 @@ import simtk.openmm.app as app
 import simtk.openmm as omm
 import simtk.unit as u
 
-from MD_utils.openmm_reporter import ContactMapReporter
+from MD_utils.openmm_reporter import (ContactMapReporter,
+                                      SparseContactMapReporter)
 from MD_utils.utils import create_md_path, touch_file
 
 
@@ -24,7 +25,8 @@ def openmm_simulate_amber_implicit(
         output_cm=None,
         report_time=10*u.picoseconds, 
         sim_time=10*u.nanoseconds,
-        reeval_time=None, 
+        reeval_time=None,
+        senders=[],
         ):
     """
     Start and run an OpenMM NVT simulation with Langevin integrator at 2 fs 
@@ -64,7 +66,7 @@ def openmm_simulate_amber_implicit(
     # set up save dir for simulation results 
     work_dir = os.getcwd() 
     time_label = int(time.time())
-    omm_path = create_md_path(time_label) 
+    omm_path = create_md_path(time_label, output_cm)
     print(f"Running simulation at {omm_path}")
 
     # setting up running path  
@@ -113,8 +115,18 @@ def openmm_simulate_amber_implicit(
     # setting up reports 
     report_freq = int(report_time/dt)
     simulation.reporters.append(app.DCDReporter(output_traj, report_freq))
-    if output_cm:
+    
+    # Concfigure contact map reporter
+    if output_cm is None:
+        pass
+    elif output_cm.endswith('h5'):
         simulation.reporters.append(ContactMapReporter(output_cm, report_freq))
+    else: 
+        file_prefix = os.path.join(os.path.abspath('.'), output_cm, output_cm)
+        simulation.reporters.append(SparseContactMapReporter(file_prefix,
+                                                             report_freq,
+                                                             senders=senders))
+
     simulation.reporters.append(app.StateDataReporter(output_log,
             report_freq, step=True, time=True, speed=True,
             potentialEnergy=True, temperature=True, totalEnergy=True))
@@ -147,7 +159,8 @@ def openmm_simulate_amber_implicit(
                         output_cm=output_cm,
                         report_time=report_time, 
                         sim_time=sim_time,
-                        reeval_time=reeval_time, 
+                        reeval_time=reeval_time,
+                        senders=senders 
                         )
             else: 
                 simulation.step(nsteps)
@@ -166,7 +179,8 @@ def openmm_simulate_amber_implicit(
                 output_cm=output_cm,
                 report_time=report_time, 
                 sim_time=sim_time,
-                reeval_time=reeval_time, 
+                reeval_time=reeval_time,
+                senders=senders 
                 )
     else: 
         return  
@@ -182,7 +196,8 @@ def openmm_simulate_amber_explicit(
         output_cm=None,
         report_time=10*u.picoseconds, 
         sim_time=10*u.nanoseconds,
-        reeval_time=None, 
+        reeval_time=None,
+        senders=[] 
         ):
     """
     Start and run an OpenMM NPT simulation with Langevin integrator at 2 fs 
@@ -222,7 +237,7 @@ def openmm_simulate_amber_explicit(
     # set up save dir for simulation results 
     work_dir = os.getcwd() 
     time_label = int(time.time())
-    omm_path = create_md_path(time_label) 
+    omm_path = create_md_path(time_label, output_cm) 
     print(f"Running simulation at {omm_path}")
 
     # setting up running path  
@@ -261,8 +276,18 @@ def openmm_simulate_amber_explicit(
 
     report_freq = int(report_time/dt)
     simulation.reporters.append(app.DCDReporter(output_traj, report_freq))
-    if output_cm:
+    
+    # Concfigure contact map reporter
+    if output_cm is None:
+        pass
+    elif output_cm.endswith('h5'):
         simulation.reporters.append(ContactMapReporter(output_cm, report_freq))
+    else:
+        file_prefix = os.path.join(os.path.abspath('.'), output_cm, output_cm)
+        simulation.reporters.append(SparseContactMapReporter(file_prefix,
+                                                             report_freq,
+                                                             senders=senders))
+
     simulation.reporters.append(app.StateDataReporter(output_log,
             report_freq, step=True, time=True, speed=True,
             potentialEnergy=True, temperature=True, totalEnergy=True))
@@ -295,7 +320,8 @@ def openmm_simulate_amber_explicit(
                         output_cm=output_cm,
                         report_time=report_time, 
                         sim_time=sim_time,
-                        reeval_time=reeval_time, 
+                        reeval_time=reeval_time,
+                        senders=senders  
                         )
             else: 
                 simulation.step(nsteps)
@@ -314,7 +340,8 @@ def openmm_simulate_amber_explicit(
                 output_cm=output_cm,
                 report_time=report_time, 
                 sim_time=sim_time,
-                reeval_time=reeval_time, 
+                reeval_time=reeval_time,
+                senders=senders 
                 )
     else: 
         return  
