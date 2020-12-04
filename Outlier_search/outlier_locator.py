@@ -2,6 +2,7 @@ import os
 import time
 import random
 import shutil 
+import logging
 import argparse 
 import numpy as np 
 from glob import glob
@@ -11,8 +12,13 @@ from utils import outliers_largeset
 from utils import find_frame, write_pdb_frame 
 from  MDAnalysis.analysis.rms import RMSD
 
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-DEBUG = 1 
+# cut off TF screen output 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+# logging setup 
+debug = 0
+log_lvl = logging.DEBUG if debug else logging.INFO
+logging.basicConfig(level=log_lvl, format='%(asctime)s %(message)s')
+logger = logging.getLogger(__name__)
 
 # Inputs 
 parser = argparse.ArgumentParser()
@@ -79,7 +85,7 @@ while not os.path.exists("halt"):
     sel_model = os.path.dirname(sel_loss) 
     sel_model_weight = sel_model + '/cvae_weight.h5'
 
-    print(("Using model {} with {}... ".format(sel_model, min(cvae_loss))))
+    logger.info(("Using model {} with {}... ".format(sel_model, min(cvae_loss))))
 
     # Get the predicted embeddings 
     # cm_files_list = [os.path.join(omm_run, 'output_cm.h5') for omm_run in omm_runs]
@@ -92,19 +98,19 @@ while not os.path.exists("halt"):
     # A record of every trajectory length
     omm_runs = [os.path.dirname(cm_file) for cm_file in cm_files_list]
     traj_dict = dict(list(zip(omm_runs, train_data_length))) 
-    print(traj_dict)
+    logger.debug(traj_dict)
 
     ## Unique outliers 
-    print("Starting outlier searching...")
+    logger.info("Starting outlier searching...")
     outlier_list_ranked, _ = outliers_from_latent_loc(
             cm_predict, n_outliers=n_outliers, n_jobs=12)  
-    print("Done outlier searching...")
-    # print(outlier_list_ranked)
+    logger.info("Done outlier searching...")
+    logger.debug(outlier_list_ranked)
 
     # Write the outliers using MDAnalysis 
     outliers_pdb_path = os.path.abspath('./outlier_pdbs') 
     os.makedirs(outliers_pdb_path, exist_ok=True) 
-    print('Writing outliers in %s' % outliers_pdb_path)  
+    logger.info('Writing outliers in %s' % outliers_pdb_path)  
 
     # identify new outliers 
     new_outliers_list = [] 
@@ -120,7 +126,7 @@ while not os.path.exists("halt"):
         new_outliers_list.append(outlier_pdb_file)
         # Only write new pdbs to reduce I/O redundancy. 
         if not os.path.exists(outlier_pdb_file): 
-            print(f'New outlier at frame {num_frame} of {run_name}')
+            logger.info(f'New outlier at frame {num_frame} of {run_name}')
             outlier_pdb = write_pdb_frame(
                     traj_file, pdb_file, num_frame, outlier_pdb_file)  
          
@@ -130,7 +136,7 @@ while not os.path.exists("halt"):
     for outlier in outliers_list: 
         if outlier not in new_outliers_list: 
             outlier_label = os.path.basename(outlier)
-            print(f'Old outlier {outlier_label} is now connected to \
+            logger.info(f'Old outlier {outlier_label} is now connected to \
                 a cluster and removing it from the outlier list ') 
             # os.rename(outlier, os.path.join(outliers_pdb_path, '-'+outlier_label)) 
 
@@ -139,12 +145,12 @@ while not os.path.exists("halt"):
     ### Get the pdbs used once already 
     used_pdbs = glob(os.path.join(md_path, 'omm_runs_*/omm_runs_*.pdb'))
     used_pdbs_labels = [os.path.basename(used_pdb) for used_pdb in used_pdbs ]
-    print(used_pdbs_labels) 
+    logger.debug(used_pdbs_labels) 
     ### Exclude the used pdbs 
     # outliers_list = glob(os.path.join(outliers_pdb_path, 'omm_runs*.pdb'))
     restart_pdbs = [outlier for outlier in new_outliers_list \
             if os.path.basename(outlier) not in used_pdbs_labels] 
-    print("restart pdbs: ", restart_pdbs)
+    logger.debug("restart pdbs: ", restart_pdbs)
 
     # rank the restart_pdbs according to their RMSD to local state 
     if ref_pdb_file: 
@@ -179,8 +185,11 @@ while not os.path.exists("halt"):
             restart_pdb = os.path.abspath(restart_pdbs.pop(0))
             with open(md + '/new_pdb', 'w') as fp: 
                 fp.write(restart_pdb)
+            logger.info(
+                    f"{md_label} will be stopped for new simulation of "\
+                    f"{os.path.basename(restart_pdb)}"
 
-    print(f"\n\n\n=======>Iteration {iteration} done<========\n\n")
+    logger.info(f"\n\n\n=======>Iteration {iteration} done<========\n\n")
     time.sleep(120)
     iteration += 1
 
