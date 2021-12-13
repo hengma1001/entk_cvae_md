@@ -42,10 +42,9 @@ outlier_path = os.path.join(base_path, 'Outlier_search')
 
 pdb_file = os.path.join(md_path, 'pdb/100-fs-peptide-400K.pdb') 
 top_file = None 
-ref_pdb_file = os.path.join(md_path, 'pdb/fs-peptide.pdb')
 
 N_jobs_MD = 120
-N_jobs_ML = 11
+N_jobs_ML = 0 #  11
 
 hrs_wt = 12 
 queue = 'batch'
@@ -131,132 +130,6 @@ class DeepDriveMD:
         return p
 
 
-    def generate_aggregating_task(self): 
-        """ 
-        Function to concatenate the MD trajectory (h5 contact map) 
-        """ 
-        p = Pipeline() 
-        p.name = 'aggragating' 
-        s2 = Stage()
-        s2.name = 'aggregating'
-
-        # Aggregation task
-        t2 = Task()
-        # https://github.com/radical-collaboration/hyperspace/blob/MD/microscope/experiments/MD_to_CVAE/MD_to_CVAE.py
-        t2.pre_exec = [] 
-        t2.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh']
-        t2.pre_exec += ['conda activate %s' % conda_path] 
-        t2.pre_exec += ['cd %s' % agg_path]
-        t2.executable = ['%s/bin/python' % conda_path]  # MD_to_CVAE.py
-        t2.arguments = [
-                '%s/MD_to_CVAE.py' % agg_path, 
-                '--sim_path', md_path, 
-                '--train_frames', 100000]
-
-        # assign hardware the task 
-        t2.cpu_reqs = {
-                'processes': 1,
-                'process_type': None,
-                'threads_per_process': 4,
-                'thread_type': 'OpenMP'
-                }
-        # Add the aggregation task to the aggreagating stage
-        s2.add_tasks(t2)
-        p.add_stages(s2) 
-        return p
-
-
-    def generate_ML_tasks(self): 
-        """
-        Function to generate the learning stage
-        """
-        p = Pipeline() 
-        p.name = 'learning' 
-        s3 = Stage()
-        s3.name = 'training'
-
-        # learn task
-        for i in range(self.num_ML): 
-            t3 = Task()
-            # https://github.com/radical-collaboration/hyperspace/blob/MD/microscope/experiments/CVAE_exps/train_cvae.py
-            t3.pre_exec = []
-            t3.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh']
-            t3.pre_exec += ['module load cuda/10.1.168']
-            t3.pre_exec += ['conda activate %s' % conda_path] 
-
-            t3.pre_exec += ['export PYTHONPATH=%s/CVAE_exps:$PYTHONPATH' % base_path]
-            t3.pre_exec += ['cd %s' % cvae_path]
-            t3.pre_exec += [f"sleep {i}"]
-            dim = i + 3 
-            t3.executable = ['%s/bin/python' % conda_path]  # train_cvae.py
-            t3.arguments = [
-                    '%s/train_cvae.py' % cvae_path, 
-                    '--h5_file', '%s/cvae_input.h5' % agg_path, 
-                    '--dim', dim] 
-            
-            t3.cpu_reqs = {
-                    'processes': 1,
-                    'process_type': None,
-                    'threads_per_process': 4,
-                    'thread_type': 'OpenMP'
-                    }
-            t3.gpu_reqs = {
-                    'processes': 1,
-                    'process_type': None,
-                    'threads_per_process': 1,
-                    'thread_type': 'CUDA'
-                    }
-        
-            # Add the learn task to the learning stage
-            s3.add_tasks(t3)
-        p.add_stages(s3)
-
-        return p 
-
-
-    def generate_interfacing_task(self): 
-        p = Pipeline() 
-        p.name = 'interfacing'
-        s4 = Stage() 
-        s4.name = 'scanning'
-
-        # Scaning for outliers and prepare the next stage of MDs 
-        t4 = Task() 
-        t4.pre_exec = [] 
-        t4.pre_exec += ['. /sw/summit/python/2.7/anaconda2/5.3.0/etc/profile.d/conda.sh']
-        t4.pre_exec += ['module load cuda/10.1.168']
-        t4.pre_exec += ['conda activate %s' % conda_path] 
-
-        t4.pre_exec += ['export PYTHONPATH=%s/CVAE_exps:$PYTHONPATH' % base_path] 
-        t4.pre_exec += ['cd %s/Outlier_search' % base_path] 
-        t4.executable = ['%s/bin/python' % conda_path] 
-        t4.arguments = [
-                'outlier_locator.py', 
-                '--md',  md_path, 
-                '--cvae', cvae_path, 
-                '--pdb', pdb_file, 
-                '--ref', ref_pdb_file,
-                '--n_out', self.num_outliers, 
-                '--timeout', self.t_timeout]
-
-        t4.cpu_reqs = {
-                'processes': 1,
-                'process_type': None,
-                'threads_per_process': 12,
-                'thread_type': 'OpenMP'
-                }
-        t4.gpu_reqs = {
-                'processes': 1,
-                'process_type': None,
-                'threads_per_process': 1,
-                'thread_type': 'CUDA'
-                }
-        s4.add_tasks(t4) 
-        p.add_stages(s4)
-        
-        return p
-
-
     def generate_pipeline(self): 
 #         p = Pipeline()
 #         p.name = 'MD_ML'
@@ -273,9 +146,6 @@ class DeepDriveMD:
 #         p.add_stages(s)
         p = [\
                 self.generate_MD_tasks(), \
-                self.generate_aggregating_task(), \
-                self.generate_ML_tasks(), \
-                self.generate_interfacing_task()\
                 ]
         
         return p
@@ -288,7 +158,7 @@ if __name__ == '__main__':
     # Create a dictionary to describe four mandatory keys:
     # resource, walltime, cores and project
     # resource is 'local.localhost' to execute locally
-    n_gpus = N_jobs_MD + N_jobs_ML + 1
+    n_gpus = N_jobs_MD + N_jobs_MLi #  + 1
     res_dict = {
             'resource': 'ornl.summit',
             'queue'   : queue,
@@ -301,9 +171,7 @@ if __name__ == '__main__':
 
     DDmd = DeepDriveMD(
             num_MD=N_jobs_MD, 
-            num_ML=N_jobs_ML,
-            num_outliers=500,
-            t_timeout=20)
+            )
     p1 = DDmd.generate_pipeline()
     # Create Application Manager
     # appman = AppManager()
