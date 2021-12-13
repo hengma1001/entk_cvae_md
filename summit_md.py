@@ -33,14 +33,14 @@ export RADICAL_ENTK_PROFILE=True
 #
 
 base_path = os.path.abspath('.') # '/gpfs/alpine/proj-shared/bip179/entk/hyperspace/microscope/experiments/'
-conda_path = '/ccs/home/hm0/.conda/envs/py3' 
+conda_path = ''' python env for entk ''' # '/ccs/home/hm0/.conda/envs/py3' 
 
 md_path = os.path.join(base_path, 'MD_exps') 
 agg_path = os.path.join(base_path, 'MD_to_CVAE') 
 cvae_path = os.path.join(base_path, 'CVAE_exps') 
 outlier_path = os.path.join(base_path, 'Outlier_search') 
 
-pdb_file = os.path.join(md_path, 'pdb/100-fs-peptide-400K.pdb') 
+pdb_file = ''' bba pdb file ''' # os.path.join(md_path, 'pdb/100-fs-peptide-400K.pdb') 
 top_file = None 
 
 N_jobs_MD = 120
@@ -58,9 +58,8 @@ class DeepDriveMD:
 
     def __init__(
             self, 
-            num_MD=1, num_ML=1, 
-            num_outliers=10, 
-            t_timeout=10): 
+            num_MD=1, 
+                    ): 
         """
         DeepDriveMD parameters 
 
@@ -68,20 +67,9 @@ class DeepDriveMD:
         ----------
         num_MD : int 
             Numbers of MD simulations 
-        num_ML : int 
-            Number of CVAE ML training runs 
-        num_outliers : int 
-            Number of outliers to identify at each iteration 
-        t_timeout : int 
-            Time range in nano-second to determine an MD simulations 
-            is to be stopped
-
         """
 
         self.num_MD = num_MD 
-        self.num_ML = num_ML 
-        self.num_outliers = num_outliers
-        self.t_timeout = t_timeout 
 
 
     def generate_MD_tasks(self): 
@@ -108,7 +96,7 @@ class DeepDriveMD:
             t1.arguments += ['--pdb_file', pdb_file]
             if top_file: 
                 t1.arguments += ['--topol', top_file]
-            t1.arguments += ['--length', 1000]
+            t1.arguments += ['--length', 1000000]
 
             # assign hardware the task 
             t1.cpu_reqs = {
@@ -158,7 +146,7 @@ if __name__ == '__main__':
     # Create a dictionary to describe four mandatory keys:
     # resource, walltime, cores and project
     # resource is 'local.localhost' to execute locally
-    n_gpus = N_jobs_MD + N_jobs_MLi #  + 1
+    n_gpus = N_jobs_MD
     res_dict = {
             'resource': 'ornl.summit',
             'queue'   : queue,
